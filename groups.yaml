@@ -1,0 +1,15 @@
+outdoorlights:
+  name: Outdoor Lights
+  entities:
+    - switch.drivewaylight_switch_12_0
+    - switch.frontdoorlight_switch_3_0
+
+whereami:
+  name: Unknown Input Location
+  entities:
+    - binary_sensor.pin2
+    - binary_sensor.pin4
+    - binary_sensor.pin5
+    - binary_sensor.pin6
+    - binary_sensor.pin11
+    - binary_sensor.pin12

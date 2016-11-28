@@ -1,0 +1,89 @@
+homeassistant:
+  name: Home
+  latitude: 47.7396
+  longitude: -122.3426
+  elevation: 129
+  unit_system: imperial
+  time_zone: America/Los_Angeles
+  customize:
+    climate.thermostat_heating_1_9_1:     { friendly_name: Thermostat }
+    climate.thermostat_cooling_1_9_2:     { hidden: true }
+    climate.thermostat_heating_econ_9_11: { hidden: true }
+    climate.thermostat_cooling_econ_9_12: { hidden: true }
+
+logger:
+  default: info
+  logs:
+    custom_components.bwio: debug
+    custom_components.binary_sensor.bwio: debug
+    custom_components.switch.bwio: debug
+
+http:
+  api_password: !secret http_password
+  ssl_certificate: !secret ssl_certificate
+  ssl_key: !secret ssl_key
+
+frontend:
+conversation:
+history:
+logbook:
+sun:
+recorder: { purge_days: 14 }
+alarm_control_panel: { platform: manual }
+climate: { platform: zwave }
+
+zwave:
+  usb_path: /dev/zwave
+  config_path: /home/pi/.homeassistant/ozwconfig
+  polling_interval: 60000
+  customize:
+    binary_sensor.multisensor_sensor_18_0:     { ignored: true }
+    sensor.multisensor_temperature_18_1:       { ignored: true }
+    sensor.multisensor_luminance_18_3:         { ignored: true }
+    sensor.multisensor_relative_humidity_18_5: { ignored: true }
+    sensor.thermostat_temperature_9_1: { polling_intensity: 1 }
+    climate.thermostat_heating_1_9_1:  { polling_intensity: 1 }
+
+bwio:
+  port: /dev/bwio
+
+sensor:
+  - platform: systemmonitor
+    resources:
+      - { type: memory_use_percent }
+      - { type: processor_use }
+  - platform: command_line
+    name: CPU Temp
+    command: "cat /sys/class/thermal/thermal_zone0/temp"
+    unit_of_measurement: "°C"
+    value_template: '{{ value | multiply(0.001) }}'
+
+binary_sensor:
+  # bedroomslider is broken, which input is it?  pin 4, 5, 6, 11 all report open but where are they?
+  - platform: bwio
+    pins: 
+       0:  [ oldbathroom, opening ]
+       1:  [ diningwindow, opening ]
+       2:  [ pin2, opening ]
+       3:  [ livingroommotion, motion ]
+       4:  [ pin4, opening ]
+       5:  [ pin5, opening ]
+       6:  [ pin6, opening ]
+       # 7 isn't connected, used as ground
+       8:  [ livingroomwindow, opening ]
+       9:  [ officewindow, opening ]
+       10: [ garagedoor, opening ]
+       11: [ pin11, opening ]
+       12: [ pin12, opening ]
+       13: [ patiodoor,  opening ]
+       14: [ frontdoor , opening ]
+       # 15 isn't connected, used as ground
+
+switch:
+  - platform: bwio
+    pins: 
+      15: alarm
+
+group: !include groups.yaml
+automation: !include automation.yaml
+

@@ -1,0 +1,12 @@
+secrets.yaml
+.uuid
+deps
+ozwconfig
+test
+home-assistant.log
+home-assistant_v2.db
+pyozw.sqlite
+OZW_Log.txt
+zwcfg_0xc4cf2c0b.xml
+zwscene.xml
+__pycache__
