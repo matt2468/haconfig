@@ -43,6 +43,11 @@ class BE369LockGroup:
 
         The default HA ZWaveAlarmSensor treats zwave alarms as separate state values and therefore won't send
         updates if the same door code entered multiple times in succession, hence this little snippet.
+
+        We also have to resort to ugliness to get the data about UserCode availability.  I may try to fix this
+        myself and submit a patch to the openzwave group later.
+
+        This has becomes pretty much all specific case work.
     """
 
     def __init__(self, hass):
@@ -50,21 +55,30 @@ class BE369LockGroup:
         self.codes  = collections.defaultdict(list)  # index  -> [values]
         self.alarms = dict()                         # nodeid -> [alarmtype, alarmval]
 
+
     def lockactivity(self, nodeid, atype, aval):
+        """ We have decoded a report (via alarms) from the BE369 lock """
         if atype == USER_CODE_ENTERED:
-            msg = 'User entered door code (node={}, slot={})'.format(nodeid, aval)
-            _LOGGER.info(msg)
+            logbook.log_entry(self.hass, "LockNameHere", 'User entered door code (node={}, slot={})'.format(nodeid, aval))
 
         elif atype == TOO_MANY_FAILED_ATTEMPTS:
             msg = 'Multiple invalid door codes enetered at node {}'.format(nodeid)
-            _LOGGER.warning(msg)
             persistent_notification.create(self.hass, msg, 'Potential Prowler')
+            _LOGGER.warning(msg)
 
         else:
-            msg = "Unknown lock alarm type! Investigate ({}, {}, {})".format(nodeid, atype, aval)
-            _LOGGER.warning(msg)
+            _LOGGER.warning("Unknown lock alarm type! Investigate ({}, {}, {})".format(nodeid, atype, aval))
 
-        logbook.log_entry(self.hass, "LockNameHere", msg)
+
+    def extractUserCodeStatus(self, value):
+        """
+          Get ready for this, the command class (UserCode) info doesn't bubble up through pyopenzwave
+          so I have to find the last received message data for the node and extract UserCodeStatus manually.
+          Not pretty but thank god I have open source code to look through.  I'll wager this is probably
+          not an interface to depend on either.
+        """
+        value.available = not value.network.manager.getNodeStatistics(value.home_id, value.parent_id)['lastReceivedMessage'][8]
+        _LOGGER.debug("{} code {} available {}".format(value.parent_id, value.index, value.available))
 
 
     def valueadded(self, node, value):
@@ -72,15 +86,20 @@ class BE369LockGroup:
         if (node.generic == zconst.GENERIC_TYPE_ENTRY_CONTROL and
             value.command_class == zconst.COMMAND_CLASS_USER_CODE and
             value.index not in NOT_USER_CODE_INDEXES):
-              _LOGGER.debug("registered usercode %s, %s on %s" % (value.index, value.label, value.parent_id))
-              self.codes[value.index].append(value)
-              self.alarms[value.parent_id] = [None]*2
+
+            _LOGGER.debug("registered usercode {}, {} on {}".format(value.index, value.label, value.parent_id))
+            value.available = None # unknown status
+            self.codes[value.index].append(value)
+            self.alarms[value.parent_id] = [None]*2
 
 
     def valuechanged(self, value):
-        """ We look for alarm messages from our locks here """
-        if value.parent_id in self.alarms and value.command_class == zconst.COMMAND_CLASS_ALARM:
-            _LOGGER.debug("alarm piece %s %s on %s" % (value.index, value.data, value.parent_id))
+        """ We look for usercode and alarm messages from our locks here """
+        if value.command_class == zconst.COMMAND_CLASS_USER_CODE:
+            self.extractUserCodeStatus(value)
+
+        elif value.parent_id in self.alarms and value.command_class == zconst.COMMAND_CLASS_ALARM:
+            _LOGGER.debug("alarm piece {} {} on {}".format(value.index, value.data, value.parent_id))
             try:
                 # OpenZwave breaks the single code/data alarm message into two values so we collect/reset here
                 bits = self.alarms[value.parent_id]
@@ -90,5 +109,5 @@ class BE369LockGroup:
                     bits[:] = [None]*2
 
             except Exception as e:
-                _LOGGER.error("exception %s: got bad data? index=%s, data=%s" % (e, value.index, value.data))
+                _LOGGER.error("exception {}: got bad data? index={}, data={}".format(e, value.index, value.data))
 
