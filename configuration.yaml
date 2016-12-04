@@ -6,22 +6,25 @@ homeassistant:
   unit_system: imperial
   time_zone: America/Los_Angeles
   customize:
-    climate.thermostat_heating_1_9_1:     { friendly_name: Thermostat }
-    climate.thermostat_cooling_1_9_2:     { hidden: true }
-    climate.thermostat_heating_econ_9_11: { hidden: true }
-    climate.thermostat_cooling_econ_9_12: { hidden: true }
+    climate.thermostat_heating_1_9_1:      { friendly_name: Thermostat }
+    climate.thermostat_cooling_1_9_2:      { hidden: true }
+    climate.thermostat_heating_econ_9_11:  { hidden: true }
+    climate.thermostat_cooling_econ_9_12:  { hidden: true }
+    sensor.frontdoorlock_alarm_type_16_0:  { hidden: true }
+    sensor.frontdoorlock_alarm_level_16_1: { hidden: true }
+    sensor.backdoorlock_alarm_type_17_0:   { hidden: true }
+    sensor.backdoorlock_alarm_level_17_1:  { hidden: true }
 
 logger:
   default: info
   logs:
     custom_components.bwio: debug
-    custom_components.binary_sensor.bwio: debug
-    custom_components.switch.bwio: debug
+    custom_components.be369group: debug
 
 http:
   api_password: !secret http_password
-  ssl_certificate: !secret ssl_certificate
-  ssl_key: !secret ssl_key
+#  ssl_certificate: !secret ssl_certificate
+#  ssl_key: !secret ssl_key
 
 frontend:
 conversation:
@@ -34,7 +37,7 @@ climate: { platform: zwave }
 
 zwave:
   usb_path: /dev/zwave
-  config_path: /home/pi/.homeassistant/ozwconfig
+  config_path: /home/bwilson/.homeassistant/ozwconfig
   polling_interval: 60000
   customize:
     binary_sensor.multisensor_sensor_18_0:     { ignored: true }
@@ -46,6 +49,8 @@ zwave:
 
 bwio:
   port: /dev/bwio
+
+be369group:
 
 sensor:
   - platform: systemmonitor
@@ -59,30 +64,41 @@ sensor:
     value_template: '{{ value | multiply(0.001) }}'
 
 binary_sensor:
-  # bedroomslider is broken, which input is it?  pin 4, 5, 6, 11 all report open but where are they?
   - platform: bwio
     pins: 
-       0:  [ oldbathroom, opening ]
-       1:  [ diningwindow, opening ]
-       2:  [ pin2, opening ]
-       3:  [ livingroommotion, motion ]
-       4:  [ pin4, opening ]
-       5:  [ pin5, opening ]
-       6:  [ pin6, opening ]
-       # 7 isn't connected, used as ground
+       0:  [ littlewindow,     opening ]
+       1:  [ diningwindow,     opening ]
+       2:  [ pin2,             opening ] # unknown signal, always ok, where is it?
+       3:  [ primarymotion,    motion  ]
+       # 4: disconnected wire in the wall of the bedroom
+       # 5: no input present
+       # 6: no input present
+       # 7: isn't connected, used as ground
        8:  [ livingroomwindow, opening ]
-       9:  [ officewindow, opening ]
-       10: [ garagedoor, opening ]
-       11: [ pin11, opening ]
-       12: [ pin12, opening ]
-       13: [ patiodoor,  opening ]
-       14: [ frontdoor , opening ]
+       9:  [ officewindow,     opening ]
+       10: [ backdoor,         opening ]
+       11: [ bedroomslider,    opening ]
+       12: [ garagedoor,       opening ]
+       13: [ patioslider,      opening ]
+       14: [ frontdoor,        opening ]
        # 15 isn't connected, used as ground
 
 switch:
   - platform: bwio
     pins: 
+      11: garagedoor
       15: alarm
+
+script:
+  garage_door:
+    sequence:
+      - service: switch.turn_on
+        data: { entity_id: switch.garagedoor }
+      - delay:
+          milliseconds: 10
+      - service: switch.turn_off
+        data: { entity_id: switch.garagedoor }
+
 
 group: !include groups.yaml
 automation: !include automation.yaml
