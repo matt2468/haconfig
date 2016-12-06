@@ -16,7 +16,7 @@ homeassistant:
     sensor.backdoorlock_alarm_level_17_1:  { hidden: true }
 
 logger:
-  default: info
+  default: debug
   logs:
     custom_components.bwio: debug
     custom_components.be369group: debug
@@ -51,6 +51,11 @@ bwio:
   port: /dev/bwio
 
 be369group:
+
+panel_custom:
+  - name: locks
+    sidebar_title: Locks
+    sidebar_icon: mdi:lock
 
 sensor:
   - platform: systemmonitor
