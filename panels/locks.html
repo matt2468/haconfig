@@ -1,0 +1,42 @@
+<dom-module id='ha-panel-locks'>
+
+  <template>
+
+    <!-- hack to get the menu button for now -->
+    <ha-menu-button class="style-scope ha-panel-logbook">
+    <paper-icon-button icon="mdi:menu" class="invisible style-scope ha-menu-button" role="button" tabindex="0" aria-disabled="false"><iron-icon id="icon" class="style-scope paper-icon-button"><svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" class="style-scope iron-icon" style="pointer-events: none; display: block; width: 100%; height: 100%;"><g class="style-scope iron-icon"><path d="M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z" class="style-scope iron-icon"></path></g></svg></iron-icon></paper-icon-button>
+    </ha-menu-button>
+    <br/>
+
+    <p>Put lock stuff here</p>
+
+  </template>
+</dom-module>
+
+<script>
+Polymer({
+  is: 'ha-panel-locks',
+  properties: {
+    // Home Assistant object
+    hass: {
+      type: Object,
+    },
+    // If should render in narrow mode
+    narrow: {
+      type: Boolean,
+      value: false,
+    },
+    // If sidebar is currently shown
+    showMenu: {
+      type: Boolean,
+      value: false,
+    },
+    // Home Assistant panel info
+    // panel.config contains config passed to register_panel serverside
+    panel: {
+      type: Object,
+    },
+  }
+});
+</script>
+
