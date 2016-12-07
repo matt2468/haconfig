@@ -4,12 +4,17 @@ outdoorlights:
     - switch.drivewaylight_switch_12_0
     - switch.frontdoorlight_switch_3_0
 
+locks:
+  name: Locks
+  entities:
+    - lock.backdoorlock_locked_17_0
+    - lock.frontdoorlock_locked_16_0
+
 perimeter:
   name: Perimeter
   entities:
+    - group.locks
     - binary_sensor.garagedoor
     - binary_sensor.backdoor
     - binary_sensor.frontdoor
-    - lock.backdoorlock_locked_17_0
-    - lock.frontdoorlock_locked_16_0
 

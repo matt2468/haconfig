@@ -16,10 +16,11 @@ homeassistant:
     sensor.backdoorlock_alarm_level_17_1:  { hidden: true }
 
 logger:
-  default: debug
+  default: info
   logs:
     custom_components.bwio: debug
-    custom_components.be369group: debug
+    custom_components.locklogger: debug
+    custom_components.usercode: debug
 
 http:
   api_password: !secret http_password
@@ -32,12 +33,10 @@ history:
 logbook:
 sun:
 recorder: { purge_days: 14 }
-alarm_control_panel: { platform: manual }
-climate: { platform: zwave }
 
 zwave:
   usb_path: /dev/zwave
-  config_path: /home/bwilson/.homeassistant/ozwconfig
+  config_path: /home/pi/.homeassistant/ozwconfig
   polling_interval: 60000
   customize:
     binary_sensor.multisensor_sensor_18_0:     { ignored: true }
@@ -50,7 +49,8 @@ zwave:
 bwio:
   port: /dev/bwio
 
-be369group:
+usercode:
+locklogger:
 
 panel_custom:
   - name: locks
