@@ -155,7 +155,7 @@ class ZWaveUserCode(zwave.ZWaveDeviceEntity, Entity):  # TODO: maybe create a ge
     @property
     def ordering(self) -> int:   return self._value.index
     @property
-    def lockentity(self) -> str: return self._value.parent_id # TODO, this is a zwave id, not an entity id
+    def lockentity(self) -> str: return self._value.parent_id # TODO, this is a zwave id, not an entity id, how to get the entity?
     @property
     def hidden(self) -> bool:    return self.codelabel in (STATE_UNKNOWN, STATE_UNASSIGNED)
     @property

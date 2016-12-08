@@ -13,7 +13,7 @@ import homeassistant.components.zwave.const as zconst
 from homeassistant.components import zwave, logbook, persistent_notification
 
 _LOGGER = logging.getLogger(__name__)
-DEPENDENCIES = ['zwave']
+DEPENDENCIES = ['zwave', 'usercode']
 DOMAIN = 'locklogger'
 
 USER_CODE_ENTERED        = 16
@@ -26,34 +26,34 @@ def setup(hass, config):
     return True
 
 class OldSchlageLockAlarmDecoder():
-    """ We aren't storing any state, just turning multiple zwave alarms into a user messages """
+    """ We aren't storing any real state, just turning multiple zwave alarms into a user messages """
     """ We expect to get a type alarm, followed by a value alarm.  At that time, deocde and reset """
 
     def __init__(self, hass):
         self.receivedtype = dict() # nodeid -> alarmtype
         self.hass = hass
 
-    def getlockname(self, nodeid):
-        """ TODO get the lock name somehow """
-        return "TODO/{}".format(nodeid)
+    def getcodename(self, node, index):
+        """ Get the label used for the given index. """
+        # TODO, is there a way to lookup entities without referencing their modules?  Would be nice.
+        from custom_components.usercode import CODEGROUP
+        for entry in CODEGROUP.entities.values():
+            if entry._value.index == index and entry._value.node == node:
+                return entry.codelabel
+        return "unknown!"
 
-    def getusername(self, index):
-        """ TODO get the user name somehow """
-        return "TODO/{}".format(index)
-
-
-    def lockactivity(self, nodeid, atype, aval):
+    def lockactivity(self, node, atype, aval):
         """ We have decoded a report (via alarms) from old Schlage locks """
         if atype == USER_CODE_ENTERED:
-            logbook.log_entry(self.hass, self.getlockname(nodeid), 'User entered code {}'.format(self.getusername(aval)))
+            logbook.log_entry(self.hass, node.name, 'User entered code {}'.format(self.getcodename(node, aval)))
 
         elif atype == TOO_MANY_FAILED_ATTEMPTS:
-            msg = 'Multiple invalid door codes enetered at {}'.format(self.getlockname(nodeid))
+            msg = 'Multiple invalid door codes entered at {}'.format(node.name)
             persistent_notification.create(self.hass, msg, 'Potential Prowler')
             _LOGGER.warning(msg)
 
         else:
-            _LOGGER.warning("Unknown lock alarm type! Investigate ({}, {}, {})".format(nodeid, atype, aval))
+            _LOGGER.warning("Unknown lock alarm type! Investigate ({}, {}, {})".format(node.node_id, atype, aval))
 
     def valuechanged(self, value):
         """ We look for usercode and alarm messages from our locks here """
@@ -67,7 +67,7 @@ class OldSchlageLockAlarmDecoder():
 
         elif value.index == 1: # info, pop out our type and process
             if value.parent_id in self.receivedtype:
-                self.lockactivity(value.parent_id, self.receivedtype.pop(value.parent_id), value.data)
+                self.lockactivity(value.node, self.receivedtype.pop(value.parent_id), value.data)
             else:
                 _LOGGER.error("got alarm value {} from {} without type".format(value.data, value.parent_id))
 
