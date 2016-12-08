@@ -4,11 +4,6 @@
     to assign a name to each entry location (a la Vera handling) so I can remember which ones to delete/reassign
     later.
 
-    I think this OldSchlage use of alarms is entirely specific to the old lock, there appears to be an actual
-    lock logging class for newer zwave devices.  Ah, corner cases, my old friend. The default HA ZWaveAlarmSensor
-    treats zwave alarms as separate state values and therefore won't send updates if the same door code entered
-    multiple times in succession, hence the zwave value change decoding below.
-
     We also have to resort to ugliness to get the data about UserCode availability.
 
     Not sure what can be reused.
@@ -16,10 +11,12 @@
 
 import logging
 import collections
+import operator
 
 import homeassistant.components.zwave.const as zconst
 from homeassistant.const import STATE_UNKNOWN
 from homeassistant.components import zwave
+from homeassistant.components import recorder
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.util.yaml  import load_yaml, dump
@@ -27,33 +24,28 @@ from homeassistant.util.yaml  import load_yaml, dump
 from pydispatch import dispatcher
 from openzwave.network import ZWaveNetwork
 
-
 _LOGGER = logging.getLogger(__name__)
-DEPENDENCIES = ['zwave']
+DEPENDENCIES = ['zwave', 'recorder']
 DOMAIN = 'usercode'
 PERSIST_FILE = 'lockinfo.yaml'
 
-USER_CODE_ENTERED        = 16
-TOO_MANY_FAILED_ATTEMPTS = 96
 USER_CODE_STATUS_BYTE    = 8
 NOT_USER_CODE_INDEXES    = (0, 254, 255)  # Enrollment code, refresh and code count
+STATE_UNASSIGNED         = "unassigned"
 
 CODEGROUP = None
-
 
 def setup(hass, config):
     """ Thanks to pydispatcher being globally available in the application, we can hook into zwave here """
     global CODEGROUP
-    CODEGROUP = UserCodesGroup(hass) 
 
-    hass.services.register(DOMAIN, "setusercode", CODEGROUP.set_code,
+    hass.services.register(DOMAIN, "setusercode", set_user_code,
                 { 'description': "Sets a user code on all locks",
                        'fields': { 'name': {'description': 'A name for reference'},
                                    'code': {'description': 'The number code to use as an ascii string'}}})
-    hass.services.register(DOMAIN, "clearusercode", CODEGROUP.clear_code,
+    hass.services.register(DOMAIN, "clearusercode", clear_user_code,
                 { 'description': "Clear a user code on all locks using name or index (only provide one of name/index)",
-                       'fields': { 'name': {'description': 'The name for the code'},
-                                  'index': {'description': 'Or the index to clear on all locks (1-19)'}}})
+                       'fields': { 'name': {'description': 'The name for the code'}}})
 
     # when a new user code value is discovered, create a ZWaveUserCode and add to our list
     def valueadded(node, value):
@@ -63,150 +55,111 @@ def setup(hass, config):
             value.index not in NOT_USER_CODE_INDEXES):                # real user code, not other indexes
 
             _LOGGER.debug("registered user code location {}, {} on {}".format(value.index, value.label, value.parent_id))
-            code = ZWaveUserCode(CODEGROUP, value)
-            CODEGROUP.add_entities([code]) # maybe hook in before add_entities if it doesn't mess other things up
-            CODEGROUP.register_code(code)
+            CODEGROUP.add_entities([ZWaveUserCode(value)]) 
 
     # Connect up to the zwave network
+    CODEGROUP = EntityComponent(_LOGGER, DOMAIN, hass)
     dispatcher.connect(valueadded, ZWaveNetwork.SIGNAL_VALUE_ADDED, weak=False)
     return True
 
 
+def set_user_code(service):
+    """ Set the ascii number string code to index X on each selected lock """
+    name = service.data.get('name')
+    code = service.data.get('code')
+    locksfound = set()
+    locksused = set()
 
-class UserCodesGroup(EntityComponent): # TODO, does this parent make sense?
-    """ Group all codes into one piece, can set single or all codes """
+    if not all([ord(x) in range(0x30, 0x39) for x in code]):
+        _LOGGER.error("Invalid code provided to setcode ({})".format(code))
+        return
 
-    def __init__(self, hass):
-        EntityComponent.__init__(self, _LOGGER, DOMAIN, hass, 200000)  # TODO: scan_interval
-        self.hass   = hass
-        self.codes  = collections.defaultdict(list)  # index  -> [ZWaveUserCode for each lock at index]
-        self.names  = dict()                         # index  -> a user defined name for this entry
-        self.load_name_info()
+    # Assign to one free space on each lock
+    for entry in sorted(CODEGROUP.entities.values(), key=operator.attrgetter('ordering')):
+        locksfound.add(entry.lockentity)
+        if entry.lockentity not in locksused and not entry.inuse:
+            entry.set_code(name, code)
+            locksused.add(entry.lockentity)
 
-
-    def load_name_info(self):
-        """ Load lock code name information after restart """
-        try:
-            self.names = load_yaml(self.hass.config.path(PERSIST_FILE))
-            _LOGGER.debug("read in state: {}".format(self.names))
-        except FileNotFoundError:
-            pass # we'll create a new one eventually
-        except Exception as e:
-            _LOGGER.warning("error loading {}: {}".format(PERSIST_FILE, e))
-
-    def store_name_info(self):
-        """ Rewrite the lock code name information """
-        return # This is failing right now, and I am looking to state obj
-        with open(self.hass.config.path(PERSIST_FILE), 'w') as out:
-            out.write("# Autogenerated file to survive data across restarts, I wouldn't recommend editing\n")
-            if len(self.names):  # barfs on empty dict
-                out.write(dump(self.names))
+    locksskipped = locksfound - locksused
+    if len(locksskipped) > 0:
+        _LOGGER.error("Failed to set the code on the following locks {}".format(locksskipped))
 
 
-    def register_code(self, codeobj):
-        """ Make note of the code obj for setting/clearing interface """
-        self.codes[codeobj._value.index].append(codeobj)
+def clear_user_code(service):
+    """ Clear a code on each lock based on name """
+    name = service.data.get('name')
+    _LOGGER.debug("clear code {}".format(CODEGROUP.entities))
+    for entry in CODEGROUP.entities.values():
+        _LOGGER.debug("Compare {} to {}".format(entry.codelabel, name))
+        if entry.codelabel == name:
+            entry.clear_code()
 
 
-    def lock_code_status(self, zcode):
-        """ We've received a new usercode status report from a lock """
-        index = zcode._value.index
-        thelist = [v.assigned for v in self.codes[index]]
-        theset  = set(thelist)
-
-        if None in theset: # Not all codes at this index refreshed for all locks
-            pass
-
-        elif len(theset) != 1: # some True, some False, this half-way state happens during set/clear
-            _LOGGER.info("Locks disagree on assignment of index {}, set = {}".format(index, theset))
-
-        elif not thelist[0]:  # False == Available
-            if index in self.names: # we have a name for something that should be unassigned, clear the name
-                del self.names[index]
-                self.store_name_info()
-
-        else: # Occupied
-            if index not in self.names: # we should have a name but we don't, add temp name
-                self.names[index] = "Unnamed Entry {}".format(index)
-                self.store_name_info()
-
-
-    ###### The following are the service call methods  ########
-
-    def set_code(self, service):
-        """ Set the ascii number string code to index X on each selected lock """
-        name  = service.data.get('name')
-        code  = service.data.get('code')
-
-        if not all([ord(x) in range(0x30, 0x39) for x in code]):
-            _LOGGER.warning("Invalid code provided to setcode ({})".format(code))
-            return
-
-        for index in range(2, 20):
-            if index not in self.names:
-                # Found an unassigned spot, set it here
-                for c in self.codes[index]:
-                    c.set_code(code)
-                self.names[index] = name
-                self.store_name_info()
-                return
-
-        _LOGGER.error("Can't find a location to set a new code!")
-
-
-    def clear_code(self, service):
-        """ Clear a code on each lock (may be passed name or index) """
-        index = -1
-        if 'name' in service.data: # the one place where we have to go from value to key
-            match = [k for k,v in self.names.items() if v == service.data.get('name')]
-            index = len(match) and match[0] or -1
-        elif 'index' in service.data:
-            index = service.data.get('index')
-
-        if index > 0 and index < 20: # OldSchlage specific right now
-            for c in self.codes[index]:
-                c.clear_code()
-        else:
-            _LOGGER.warning("Unable to find an index for code to clear based on arg {}".format(service.data))
+def hack_load_previous_state(entity_id):
+    """ Hack to lookup the previous state if we can """
+    try:
+        from sqlalchemy import desc
+        local = recorder._INSTANCE.engine.connect() # trying to avoid thread access issues I was having
+        ret = local.execute("select state from states where domain='usercode' and entity_id=:eid order by state_id desc",
+                                {'eid': entity_id}).first()[0]
+        local.close()
+        return ret
+    except Exception as e:
+        _LOGGER.debug("Failed to load previous states: {}".format(e))
+        return STATE_UNKNOWN
 
 
 
-class ZWaveUserCode(zwave.ZWaveDeviceEntity, Entity):  # TODO: maybe a generic HA component add-in like lock
+class ZWaveUserCode(zwave.ZWaveDeviceEntity, Entity):  # TODO: maybe create a generic HA component like UserCode
     """ Schlage locks don't send you the code, but they do tell if the spot is has a code assigned """
-    """ Our state is assigned/unassigned but when we set the code data """
+    """ Our state is the label assigned to the user code or unassigned if nothing is there """
 
-    def __init__(self, codegroup, value):
+    def __init__(self, value):
         zwave.ZWaveDeviceEntity.__init__(self, value, 'usercode')
-        self.codegroup = codegroup
-        self.assigned = None 
         dispatcher.connect(self._value_changed, ZWaveNetwork.SIGNAL_VALUE_CHANGED)
+        self.codelabel = hack_load_previous_state(self.entity_id)
+        _LOGGER.debug("ZWaveUserCode initial state {}".format(self.codelabel))
 
     def _value_changed(self, value):
         """ We got a code update, data is just '****' but there is a status byte in the command class """
         if self._value.value_id == value.value_id:
             # PyOZW doesn't expose command class data, we reach into the raw message data and get it ourselves
-            self.assigned = bool(value.network.manager.getNodeStatistics(value.home_id, value.parent_id)['lastReceivedMessage'][USER_CODE_STATUS_BYTE])
-            _LOGGER.debug("{} code {} assigned {}".format(value.parent_id, value.index, self.assigned))
+            assigned = bool(value.network.manager.getNodeStatistics(value.home_id, value.parent_id)['lastReceivedMessage'][USER_CODE_STATUS_BYTE])
+            _LOGGER.debug("{} code {} assigned {}".format(value.parent_id, value.index, assigned))
+            # Update our label
+            if not assigned:
+                self.codelabel = STATE_UNASSIGNED
+            elif self.codelabel == STATE_UNKNOWN:
+                self.codelabel = "Unnamed Entry {}".format(value.index) # we didn't load a previous state
             self.update_ha_state()
-            self.codegroup.lock_code_status(self)
 
-    def set_code(self, code):
-        _LOGGER.debug("setting code on {} as index {}".format(self._value.parent_id, self._value.index))
+    def set_code(self, label, code):
+        _LOGGER.debug("setting code with label {}".format(label))
+        self.codelabel = label
         self._value.data = code
 
     def clear_code(self):
-        _LOGGER.debug("clearing code on {} as index {}".format(self._value.parent_id, self._value.index))
+        _LOGGER.debug("setting code with label {}".format(self.codelabel))
         self._value.data = "\0\0\0\0"  # My patch to OZW should cause a clear
+        # don't clear label until we get confirmation from the lock
 
+    """
+      Properties:
+        orderby:    a value by which to order user codes (like index)
+        lockentity: the entity_id of the lock this code is bound to
+        hidden:     true for unknown and unassigned codes
+        inuse:      true if we can't assign codes to it at this time
+        state:      one of unknown, unassigned or the name label assigned to it
+    """
     @property
-    def hidden(self) -> bool:
-        """ Hide things from UI that don't have a code assigned  """
-        return not self.assigned 
-
+    def ordering(self) -> int:   return self._value.index
     @property
-    def state(self) -> str:
-        """Return the state."""
-        if self.assigned is None:
-            return STATE_UNKNOWN
-        return 'assigned' if self.assigned else 'unassigned'
+    def lockentity(self) -> str: return self._value.parent_id # TODO, this is a zwave id, not an entity id
+    @property
+    def hidden(self) -> bool:    return self.codelabel in (STATE_UNKNOWN, STATE_UNASSIGNED)
+    @property
+    def inuse(self) -> bool:     return self.codelabel != STATE_UNASSIGNED
+    @property
+    def state(self) -> str:      return self.codelabel
 
