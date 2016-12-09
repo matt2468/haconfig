@@ -18,14 +18,16 @@ homeassistant:
 logger:
   default: info
   logs:
+    homeassistant.core: warning
     custom_components.bwio: debug
     custom_components.locklogger: debug
     custom_components.usercode: debug
 
 http:
   api_password: !secret http_password
-#  ssl_certificate: !secret ssl_certificate
-#  ssl_key: !secret ssl_key
+  ssl_certificate: !secret ssl_certificate
+  ssl_key: !secret ssl_key
+  #ssl_peer_authority: !secret ssl_peer_authority
 
 frontend:
 conversation:

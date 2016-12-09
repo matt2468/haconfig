@@ -44,8 +44,12 @@ def setup(hass, config):
                        'fields': { 'name': {'description': 'A name for reference'},
                                    'code': {'description': 'The number code to use as an ascii string'}}})
     hass.services.register(DOMAIN, "clearusercode", clear_user_code,
-                { 'description': "Clear a user code on all locks using name or index (only provide one of name/index)",
+                { 'description': "Clear a user code on all locks using name",
                        'fields': { 'name': {'description': 'The name for the code'}}})
+    hass.services.register(DOMAIN, "renameusercode", rename_user_code,
+                { 'description': "Rename a user code on all locks",
+                       'fields': { 'oldname': {'description': 'The present name for the code'},
+                                   'newname': {'description': 'The new name for the code'}}})
 
     # when a new user code value is discovered, create a ZWaveUserCode and add to our list
     def valueadded(node, value):
@@ -91,16 +95,27 @@ def clear_user_code(service):
     name = service.data.get('name')
     _LOGGER.debug("clear code {}".format(CODEGROUP.entities))
     for entry in CODEGROUP.entities.values():
-        _LOGGER.debug("Compare {} to {}".format(entry.codelabel, name))
         if entry.codelabel == name:
             entry.clear_code()
+
+
+def rename_user_code(service):
+    """ Rename a code whereever we find it """
+    oldname = service.data.get('oldname')
+    newname = service.data.get('newname')
+    _LOGGER.debug("rename {} to {}".format(oldname, newname))
+    for entry in CODEGROUP.entities.values():
+        if entry.codelabel == oldname:
+            entry.codelabel = newname
+            entry.update_ha_state()
 
 
 def hack_load_previous_state(entity_id):
     """ Hack to lookup the previous state if we can """
     try:
         from sqlalchemy import desc
-        local = recorder._INSTANCE.engine.connect() # trying to avoid thread access issues I was having
+        recorder._verify_instance()
+        local = recorder._INSTANCE.engine.connect() # trying to avoid thread access issues I was having, this is a hack already, so...
         ret = local.execute("select state from states where domain='usercode' and entity_id=:eid order by state_id desc",
                                 {'eid': entity_id}).first()[0]
         local.close()
@@ -117,9 +132,9 @@ class ZWaveUserCode(zwave.ZWaveDeviceEntity, Entity):  # TODO: maybe create a ge
 
     def __init__(self, value):
         zwave.ZWaveDeviceEntity.__init__(self, value, 'usercode')
-        dispatcher.connect(self._value_changed, ZWaveNetwork.SIGNAL_VALUE_CHANGED)
         self.codelabel = hack_load_previous_state(self.entity_id)
         _LOGGER.debug("ZWaveUserCode initial state {}".format(self.codelabel))
+        dispatcher.connect(self._value_changed, ZWaveNetwork.SIGNAL_VALUE_CHANGED)
 
     def _value_changed(self, value):
         """ We got a code update, data is just '****' but there is a status byte in the command class """
@@ -127,7 +142,7 @@ class ZWaveUserCode(zwave.ZWaveDeviceEntity, Entity):  # TODO: maybe create a ge
             # PyOZW doesn't expose command class data, we reach into the raw message data and get it ourselves
             assigned = bool(value.network.manager.getNodeStatistics(value.home_id, value.parent_id)['lastReceivedMessage'][USER_CODE_STATUS_BYTE])
             _LOGGER.debug("{} code {} assigned {}".format(value.parent_id, value.index, assigned))
-            # Update our label
+            # Update our label if necessary (don't have one or its no longer set on the lock)
             if not assigned:
                 self.codelabel = STATE_UNASSIGNED
             elif self.codelabel == STATE_UNKNOWN:
@@ -138,6 +153,7 @@ class ZWaveUserCode(zwave.ZWaveDeviceEntity, Entity):  # TODO: maybe create a ge
         _LOGGER.debug("setting code with label {}".format(label))
         self.codelabel = label
         self._value.data = code
+        # Setting data will cause a value change and subsequent state update call
 
     def clear_code(self):
         _LOGGER.debug("setting code with label {}".format(self.codelabel))
