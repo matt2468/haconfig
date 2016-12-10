@@ -1,9 +1,17 @@
 
+- alias: Clean out bad climate data from database
+  trigger:
+    platform: time
+    minutes: 0
+    seconds: 0
+  action:
+    service: shell_command.cleantemps
+
+
 - alias: Turn external lights on before sunset
   trigger:
     platform: sun
     event: sunset
-    offset: "-01:00:00"
   action:
     service: homeassistant.turn_on
     entity_id: group.outdoorlights
@@ -12,7 +20,6 @@
   trigger:
     platform: sun
     event: sunrise
-    offset: "+01:00:00"
   action:
     service: homeassistant.turn_off
     entity_id: group.outdoorlights

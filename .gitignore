@@ -3,7 +3,6 @@ lockinfo.yaml
 .uuid
 deps
 ozwconfig
-test
 home-assistant.log
 home-assistant_v2.db
 pyozw.sqlite

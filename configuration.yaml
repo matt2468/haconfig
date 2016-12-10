@@ -19,9 +19,7 @@ logger:
   default: info
   logs:
     homeassistant.core: warning
-    custom_components.bwio: debug
-    custom_components.locklogger: debug
-    custom_components.usercode: debug
+    custom_components: debug
 
 http:
   api_password: !secret http_password
@@ -106,6 +104,8 @@ script:
       - service: switch.turn_off
         data: { entity_id: switch.garagedoor }
 
+shell_command:
+  cleantemps: './cleantemps.py'
 
 group: !include groups.yaml
 automation: !include automation.yaml
