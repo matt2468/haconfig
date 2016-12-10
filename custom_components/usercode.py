@@ -1,5 +1,5 @@
 """
-    Group all the locks info together so we can set the same code in the same slot on each lock.  The Schlage
+    Group all the locks info together so we can set the same code on each lock.  The Schlage
     locks do not let you download the user codes though I really don't care to store them anyhow, I just want
     to assign a name to each entry location (a la Vera handling) so I can remember which ones to delete/reassign
     later.
@@ -27,7 +27,6 @@ from openzwave.network import ZWaveNetwork
 _LOGGER = logging.getLogger(__name__)
 DEPENDENCIES = ['zwave', 'recorder']
 DOMAIN = 'usercode'
-PERSIST_FILE = 'lockinfo.yaml'
 
 USER_CODE_STATUS_BYTE    = 8
 NOT_USER_CODE_INDEXES    = (0, 254, 255)  # Enrollment code, refresh and code count
@@ -80,10 +79,10 @@ def set_user_code(service):
 
     # Assign to one free space on each lock
     for entry in sorted(CODEGROUP.entities.values(), key=operator.attrgetter('ordering')):
-        locksfound.add(entry.lockentity)
-        if entry.lockentity not in locksused and not entry.inuse:
+        locksfound.add(entry.lockid)
+        if entry.lockid not in locksused and not entry.inuse:
             entry.set_code(name, code)
-            locksused.add(entry.lockentity)
+            locksused.add(entry.lockid)
 
     locksskipped = locksfound - locksused
     if len(locksskipped) > 0:
@@ -126,8 +125,8 @@ def hack_load_previous_state(entity_id):
 
 
 
-class ZWaveUserCode(zwave.ZWaveDeviceEntity, Entity):  # TODO: maybe create a generic HA component like UserCode
-    """ Schlage locks don't send you the code, but they do tell if the spot is has a code assigned """
+class ZWaveUserCode(zwave.ZWaveDeviceEntity, Entity):
+    """ Represents a single user code entry value on a z-wave node. """
     """ Our state is the label assigned to the user code or unassigned if nothing is there """
 
     def __init__(self, value):
@@ -137,7 +136,7 @@ class ZWaveUserCode(zwave.ZWaveDeviceEntity, Entity):  # TODO: maybe create a ge
         dispatcher.connect(self._value_changed, ZWaveNetwork.SIGNAL_VALUE_CHANGED)
 
     def _value_changed(self, value):
-        """ We got a code update, data is just '****' but there is a status byte in the command class """
+        """ We got a code update, data is probably just '****' but there is a status byte in the command class """
         if self._value.value_id == value.value_id:
             # PyOZW doesn't expose command class data, we reach into the raw message data and get it ourselves
             assigned = bool(value.network.manager.getNodeStatistics(value.home_id, value.parent_id)['lastReceivedMessage'][USER_CODE_STATUS_BYTE])
@@ -156,26 +155,27 @@ class ZWaveUserCode(zwave.ZWaveDeviceEntity, Entity):  # TODO: maybe create a ge
         # Setting data will cause a value change and subsequent state update call
 
     def clear_code(self):
-        _LOGGER.debug("setting code with label {}".format(self.codelabel))
+        _LOGGER.debug("clearing code with label {}".format(self.codelabel))
         self._value.data = "\0\0\0\0"  # My patch to OZW should cause a clear
         # don't clear label until we get confirmation from the lock
 
     """
-      Properties:
-        orderby:    a value by which to order user codes (like index)
-        lockentity: the entity_id of the lock this code is bound to
-        hidden:     true for unknown and unassigned codes
-        inuse:      true if we can't assign codes to it at this time
-        state:      one of unknown, unassigned or the name label assigned to it
+      Code Properties:
+        ordering: a value by which to order user codes when picking an empty spot
+        lockid:   a unique identifier for the lock this code is bound to
+        inuse:    true if we can't assign codes to it at this time
+      Overriden Properties:
+        hidden:   true for unknown and unassigned codes
+        state:    one of unknown, unassigned or the name label assigned
     """
     @property
-    def ordering(self) -> int:   return self._value.index
+    def ordering(self) -> int: return self._value.index
     @property
-    def lockentity(self) -> str: return self._value.parent_id # TODO, this is a zwave id, not an entity id, how to get the entity?
+    def lockid(self) -> str:   return self._value.parent_id # NOTE: this is a zwave id, not a HA entity id
     @property
-    def hidden(self) -> bool:    return self.codelabel in (STATE_UNKNOWN, STATE_UNASSIGNED)
+    def inuse(self) -> bool:   return self.codelabel != STATE_UNASSIGNED
     @property
-    def inuse(self) -> bool:     return self.codelabel != STATE_UNASSIGNED
+    def hidden(self) -> bool:  return self.codelabel in (STATE_UNKNOWN, STATE_UNASSIGNED)
     @property
-    def state(self) -> str:      return self.codelabel
+    def state(self) -> str:    return self.codelabel
 
