@@ -40,11 +40,11 @@ def setup(hass, config):
 
     hass.services.register(DOMAIN, "setusercode", set_user_code,
                 { 'description': "Sets a user code on all locks",
-                       'fields': { 'name': {'description': 'A name for reference'},
-                                   'code': {'description': 'The number code to use as an ascii string'}}})
+                       'fields': { 'newname': {'description': 'A name for reference'},
+                                      'code': {'description': 'The code to use as an ascii string of [0-9]'}}})
     hass.services.register(DOMAIN, "clearusercode", clear_user_code,
                 { 'description': "Clear a user code on all locks using name",
-                       'fields': { 'name': {'description': 'The name for the code'}}})
+                       'fields': { 'oldname': {'description': 'The name of the code'}}})
     hass.services.register(DOMAIN, "renameusercode", rename_user_code,
                 { 'description': "Rename a user code on all locks",
                        'fields': { 'oldname': {'description': 'The present name for the code'},
@@ -68,7 +68,7 @@ def setup(hass, config):
 
 def set_user_code(service):
     """ Set the ascii number string code to index X on each selected lock """
-    name = service.data.get('name')
+    newname = service.data.get('newname')
     code = service.data.get('code')
     locksfound = set()
     locksused = set()
@@ -81,7 +81,7 @@ def set_user_code(service):
     for entry in sorted(CODEGROUP.entities.values(), key=operator.attrgetter('ordering')):
         locksfound.add(entry.lockid)
         if entry.lockid not in locksused and not entry.inuse:
-            entry.set_code(name, code)
+            entry.set_code(newname, code)
             locksused.add(entry.lockid)
 
     locksskipped = locksfound - locksused
@@ -91,10 +91,10 @@ def set_user_code(service):
 
 def clear_user_code(service):
     """ Clear a code on each lock based on name """
-    name = service.data.get('name')
+    oldname = service.data.get('oldname')
     _LOGGER.debug("clear code {}".format(CODEGROUP.entities))
     for entry in CODEGROUP.entities.values():
-        if entry.codelabel == name:
+        if entry.codelabel == oldname:
             entry.clear_code()
 
 
@@ -178,4 +178,12 @@ class ZWaveUserCode(zwave.ZWaveDeviceEntity, Entity):
     def hidden(self) -> bool:  return self.codelabel in (STATE_UNKNOWN, STATE_UNASSIGNED)
     @property
     def state(self) -> str:    return self.codelabel
+
+    @property
+    def device_state_attributes(self):
+        """ Append some more interesting attributes to the state info """
+        data = super().device_state_attributes
+        data['inuse'] = self.inuse
+        data['index'] = self._value.index
+        return data
 

@@ -1,5 +1,19 @@
 <dom-module id='ha-panel-locks'>
     <style include='ha-style'>
+      .content {
+        padding: 24px;
+      }
+      .ha-form {
+        margin-right: 16px;
+        max-width: 500px;
+      }
+      .content td:first-child {
+        text-align: right;
+      }
+      .warning {
+        color: red;
+        font-weight: bold;
+      }
     </style>
 
     <template>
@@ -12,22 +26,26 @@
         </app-header>
 
         <div class='content'>
-            <div class='ha-form'>
-            <vaadin-combo-box label='Call' items='[[calltypes]]' value='{{calltype}}'></vaadin-combo-box>
-            <paper-textarea label='Something' value='{{calltype}}'></paper-textarea>
-            <paper-button on-tap='setusercode' raised>Call</paper-button>
-            </div>
-
-            <ol>
+            <p>Your current locks and codes</p>
+            <table>
             <template is='dom-repeat' items='[[locks]]' as='lock'>
-                <li>[[lock.entityId]] [[lock.state]]</li>
+                <tr><th colspan='2'>[[lock.name]] (Batt [[lock.battery]]%)</th></tr>
+                <template is='dom-repeat' items='[[lock.codes]]' as='code'>
+                    <tr>
+                        <td>[[code.index]]</td>
+                        <td class$='[[code.selector]]'>[[code.label]]</td>
+                    </tr>
+                </template>
             </template>
-            </ol>
-            <ol>
-            <template is='dom-repeat' items='[[codes]]' as='code'>
-                <li>[[code.entityId]] [[code.state]]</li>
-            </template>
-            </ol>
+            </table>
+
+            <div class='ha-form'>
+            <vaadin-combo-box label='Action' items='[[calltypes]]' value='{{thecall}}' item-label-path="label" item-value-path="call"></vaadin-combo-box>
+            <template is='dom-if' if='[[doshowoldname(thecall)]]'><paper-textarea label='Old name' value='{{oldname}}'></paper-textarea></template>
+            <template is='dom-if' if='[[doshownewname(thecall)]]'><paper-textarea label='New name' value='{{newname}}'></paper-textarea></template>
+            <template is='dom-if' if='[[doshowcode(thecall)]]'>   <paper-textarea label='Code'     value='{{code}}'>   </paper-textarea></template>
+            <paper-button on-tap='docall' raised>Execute</paper-button>
+            </div>
         </div>
       </app-header-layout>
     </template>
@@ -51,28 +69,87 @@ Polymer({
       bindNuclear: function (hass) {
         return [
           hass.entityGetters.entityMap,
-          function (map) { return map.valueSeq().filter(function (entity) { return entity.domain == 'lock'}).toArray();
+          function (map) {
+            objs = {};
+            // for each zwave lock/usercode, collect the pertinant information
+            map.forEach(function (entity, eid) { 
+                if (entity.domain != 'lock' && entity.domain != 'usercode') return;
+                if (!('node_id' in entity.attributes)) return;
+                key = entity.attributes.node_id;
+                if (!(key in objs)) { // Create default tracker for this lock if not already present
+                    objs[key] = {
+                        nodeid: key,
+                        name: 'something went wrong',
+                        battery: 100,
+                        codes: []
+                    };
+                }
+
+                if (entity.domain == 'lock') {
+                    objs[key].name = eid;
+                    objs[key].battery = entity.attributes.battery_level;
+                }
+                if ((entity.domain == 'usercode') && (entity.state != 'unassigned')) {
+                    objs[key].codes.push({
+                        index: entity.attributes.index,
+                        label: entity.state,
+                        selector: (entity.state == 'unknown') ? 'warning' : ''
+                    });
+                }
+            });
+
+            // generate an array from the object data and sort both outer and inner arrays
+            ret = [];
+            Object.keys(objs).forEach(function (key) {
+                objs[key].codes.sort(function (a, b) { return a.index - b.index; });
+                ret.push(objs[key]);
+            });
+            ret.sort(function(a, b) { return a.nodeid - b.nodeid; });
+            return ret;
         }];
     }},
 
-    codes: {
-      type: Array,
-      bindNuclear: function (hass) {
-        return [
-          hass.entityGetters.entityMap,
-          function (map) { return map.valueSeq().filter(function (entity) { return entity.domain == 'usercode'}).toArray();
-        }];
-    }},
+    // What can we do
+    calltypes: { type: Array, value: [
+       { label:'Assign New Code', call:'setusercode'   },
+       { label:'Delete a Code',   call:'clearusercode' },
+       { label:'Rename a Code',   call:'renameusercode'}
+    ]},
 
-    // Some static bits
-    calltypes: { type: Array, value: ['Create New Code', 'Delete a Code', 'Rename a Code'] },
-    calltype:  { type: String, value: ''},
+    // What has the user selected/entered
+    thecall:  { type: String, value: ''},
+    oldname:  { type: String, value: ''},
+    newname:  { type: String, value: ''},
+       code:  { type: String, value: ''},
   },
   // End of properties
 
-  setusercode: function () {
-     alert("setusercode");
-     //this.hass.serviceActions.callService('usercode', 'setusercode', serviceData);
+  doshowoldname: function(c) { return c == 'clearusercode' || c == 'renameusercode'; },
+  doshownewname: function(c) { return c == 'setusercode'   || c == 'renameusercode'; },
+  doshowcode:    function(c) { return c == 'setusercode'; },
+
+  docall: function () {
+
+    // get lightly checked versions of input data
+    var args = {};
+    var vo, vn, vc;
+    if ((this.oldname != '') && (this.oldname.length < 64)) { args['oldname'] = this.oldname; vo = true; }
+    if ((this.newname != '') && (this.newname.length < 64)) { args['newname'] = this.newname; vn = true; }
+    if ((this.code    != '') && (this.code.length    < 7))  { args['code']    = this.code;    vc = true; }
+
+    // Do we have the necessary args?
+    if ((this.thecall == 'renameusercode') && (!vo || !vn)) {
+        alert("Need a valid old name and new name");
+        return;
+    } else if ((this.thecall == 'setusercode') && (!vn || !vc)) {
+        alert("Need a valid name and code");
+        return;
+    } else if ((this.thecall == 'clearusercode') && !vo) {
+        alert("Need a valid name");
+        return;
+    }
+
+    this.hass.serviceActions.callService('usercode', this.thecall, args);
   },
 
 
