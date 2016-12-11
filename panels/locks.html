@@ -1,9 +1,5 @@
 <dom-module id='ha-panel-locks'>
-    <style>
-        app-toolbar.ha-panel-locks { 
-            background-color: var(--primary-color);
-            color: #fff;
-        }
+    <style include='ha-style'>
     </style>
 
     <template>
@@ -16,6 +12,12 @@
         </app-header>
 
         <div class='content'>
+            <div class='ha-form'>
+            <vaadin-combo-box label='Call' items='[[calltypes]]' value='{{calltype}}'></vaadin-combo-box>
+            <paper-textarea label='Something' value='{{calltype}}'></paper-textarea>
+            <paper-button on-tap='setusercode' raised>Call</paper-button>
+            </div>
+
             <ol>
             <template is='dom-repeat' items='[[locks]]' as='lock'>
                 <li>[[lock.entityId]] [[lock.state]]</li>
@@ -62,7 +64,18 @@ Polymer({
         }];
     }},
 
+    // Some static bits
+    calltypes: { type: Array, value: ['Create New Code', 'Delete a Code', 'Rename a Code'] },
+    calltype:  { type: String, value: ''},
   },
+  // End of properties
+
+  setusercode: function () {
+     alert("setusercode");
+     //this.hass.serviceActions.callService('usercode', 'setusercode', serviceData);
+  },
+
+
 });
 </script>
 

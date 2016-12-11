@@ -54,7 +54,7 @@ locklogger:
 
 panel_custom:
   - name: locks
-    sidebar_title: Locks
+    sidebar_title: ZWave Locks
     sidebar_icon: mdi:lock
 
 sensor:
