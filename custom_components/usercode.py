@@ -12,6 +12,7 @@
 import logging
 import collections
 import operator
+from datetime import datetime, timedelta
 
 import homeassistant.components.zwave.const as zconst
 from homeassistant.const import STATE_UNKNOWN
@@ -19,7 +20,7 @@ from homeassistant.components import zwave
 from homeassistant.components import recorder
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_component import EntityComponent
-from homeassistant.util.yaml  import load_yaml, dump
+from homeassistant.helpers.event import track_time_change
 
 from pydispatch import dispatcher
 from openzwave.network import ZWaveNetwork
@@ -37,6 +38,7 @@ CODEGROUP = None
 def setup(hass, config):
     """ Thanks to pydispatcher being globally available in the application, we can hook into zwave here """
     global CODEGROUP
+    stopcall = None
 
     hass.services.register(DOMAIN, "setusercode", set_user_code,
                 { 'description': "Sets a user code on all locks",
@@ -60,9 +62,27 @@ def setup(hass, config):
             _LOGGER.debug("registered user code location {}, {} on {}".format(value.index, value.label, value.parent_id))
             CODEGROUP.add_entities([ZWaveUserCode(value)]) 
 
+    def refresh_unknown(now):
+        """ OZW/refresh_all_user_codes doesn't always work with my locks, keep at it until we have status """
+        _LOGGER.debug("refresh at {}".format(now))
+        for code in CODEGROUP.entities.values():
+            if code.state == STATE_UNKNOWN: 
+                # Make a single request now, don't spam zwave network
+                code.refresh()
+                return
+        # Everything has a status, stop the listener
+        _LOGGER.debug("stopcall is {}".format(stopcall))
+        stopcall()
+
+    def start_refresher(event):
+        """ Don't start the refresher until the zwave network is ready to go """
+        pass
+        #stopcall = track_time_change(hass, refresh_unknown, seconds='0')
+
     # Connect up to the zwave network
     CODEGROUP = EntityComponent(_LOGGER, DOMAIN, hass)
     dispatcher.connect(valueadded, ZWaveNetwork.SIGNAL_VALUE_ADDED, weak=False)
+    hass.bus.listen_once(zconst.EVENT_NETWORK_COMPLETE, start_refresher)
     return True
 
 
@@ -148,14 +168,21 @@ class ZWaveUserCode(zwave.ZWaveDeviceEntity, Entity):
                 self.codelabel = "Unnamed Entry {}".format(value.index) # we didn't load a previous state
             self.update_ha_state()
 
+    def refresh(self):
+        """ Only called if for some reason, we never got an initial status report from this value """
+        _LOGGER.debug("refreshing data at {}".format(self._value.index))
+        self._value.refresh()
+
     def set_code(self, label, code):
-        _LOGGER.debug("setting code with label {}".format(label))
+        """ Set the code at this objects index/location """
+        _LOGGER.debug("setting code at {} with label {}".format(self._value.index, label))
         self.codelabel = label
         self._value.data = code
         # Setting data will cause a value change and subsequent state update call
 
     def clear_code(self):
-        _LOGGER.debug("clearing code with label {}".format(self.codelabel))
+        """ Clear the code at this objects index/location """
+        _LOGGER.debug("clearing code at {} with label {}".format(self._value.index, self.codelabel))
         self._value.data = "\0\0\0\0"  # My patch to OZW should cause a clear
         # don't clear label until we get confirmation from the lock
 

@@ -10,7 +10,7 @@ try:
         attr = json.loads(row[1])
         if attr.get('temperature', 70) not in range(50, 85) or attr.get('current_temperature', 70) not in range(45, 100):
             todel.append(str(row[0]))
-    count = conn.execute("delete from states where state_id in (:todel)", {"todel":','.join(todel)}).rowcount
+    count = conn.execute("delete from states where state_id in ({})".format(','.join(todel))).rowcount
     print("Deleted {} rows".format(count))
     conn.commit()
     conn.close()
