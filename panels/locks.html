@@ -152,6 +152,10 @@ Polymer({
     this.hass.serviceActions.callService('usercode', this.thecall, args);
   },
 
+  // load the service-panel file so we can get the necessary bits without needing to build everything
+  created: function() {
+      this.importHref('/static/panels/ha-panel-dev-service.html', function() {}, function() {}, true)
+  }
 
 });
 </script>
