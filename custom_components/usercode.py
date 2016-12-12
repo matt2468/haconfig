@@ -191,7 +191,7 @@ class ZWaveUserCode(zwave.ZWaveDeviceEntity, Entity):
         lockid:   a unique identifier for the lock this code is bound to
         inuse:    true if we can't assign codes to it at this time
       Overriden Properties:
-        hidden:   true for unknown and unassigned codes
+        hidden:   true as the custom panel takes care of things now
         state:    one of unknown, unassigned or the name label assigned
     """
     @property
@@ -201,7 +201,7 @@ class ZWaveUserCode(zwave.ZWaveDeviceEntity, Entity):
     @property
     def inuse(self) -> bool:   return self.codelabel != STATE_UNASSIGNED
     @property
-    def hidden(self) -> bool:  return self.codelabel in (STATE_UNKNOWN, STATE_UNASSIGNED)
+    def hidden(self) -> bool:  return True
     @property
     def state(self) -> str:    return self.codelabel
 
