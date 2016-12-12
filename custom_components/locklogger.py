@@ -21,10 +21,6 @@ TOO_MANY_FAILED_ATTEMPTS = 96
 EVENT_DOOR_CODE_ENTERED       = 'security.doorcodeentered'
 EVENT_DOOR_TOO_MANY_ATTEMPTS  = 'security.toomanydoorattempts'
 
-KNOWN_DEVICES = [ # manufacturer_id, product_type, product_id
-    (0x003b, 0x634b, 0x5044) # Schlage BE-369
-]
-
 
 def setup(hass, config):
     """ Start a simple decoder of old lock alarm signals """
@@ -42,7 +38,7 @@ class LockAlarmDecoder():
         self.hass = hass
 
     def getcodename(self, node, index):
-        """ Get the label used for the given index. """
+        """ Get the label used for the given index or get return the nodeid/index """
         # TODO, is there a way to lookup other entities without referencing their modules?  Would be nice.
         from custom_components.usercode import CODEGROUP
         for entry in CODEGROUP.entities.values():
@@ -67,15 +63,20 @@ class LockAlarmDecoder():
             _LOGGER.warning("Unknown lock alarm type! Investigate ({}, {}, {})".format(node.node_id, atype, aval))
 
     def valuechanged(self, value):
+        """ Switch on (manufacturer_id, product_type, product_id) to determine what method to use """
+        mid = int(value.node.manufacturer_id, 16)
+        pid = (int(value.node.product_type, 16), int(value.node.product_id, 16))
+
+        if mid == 0x003b: # Schlage
+            if pid == (0x634b, 0x5044): # BE-369
+                self.decodebe369(value)
+
+    def decodebe369(self, value):
         """ We look for usercode and alarm messages from our known locks here """
         if value.node.generic != zconst.GENERIC_TYPE_ENTRY_CONTROL: return
         if value.command_class != zconst.COMMAND_CLASS_ALARM:       return
 
-        # Only looking at things I actually know about
-        node_key = (int(value.node.manufacturer_id, 16), int(value.node.product_type, 16), int(value.node.product_id, 16))
-        if node_key not in KNOWN_DEVICES: return
-
-        _LOGGER.debug("alarm piece {} {} on {}".format(value.index, value.data, value.parent_id))
+        _LOGGER.debug("be369 piece {} {} on {}".format(value.index, value.data, value.parent_id))
 
         if value.index == 0: # type
             self.receivedtype[value.parent_id] = value.data

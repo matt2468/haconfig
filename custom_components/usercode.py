@@ -1,8 +1,8 @@
 """
     Group all the locks info together so we can set the same code on each lock.  The Schlage
-    locks do not let you download the user codes though I really don't care to store them anyhow, I just want
-    to assign a name to each entry location (a la Vera handling) so I can remember which ones to delete/reassign
-    later.
+    locks do not let you download the user codes though I really don't care to store them
+    anyhow, I just want to assign a name to each entry location (a la Vera handling) so I can
+    remember which ones to delete/reassign later.
 
     We also have to resort to ugliness to get the data about UserCode availability.
 
@@ -36,9 +36,8 @@ STATE_UNASSIGNED         = "unassigned"
 CODEGROUP = None
 
 def setup(hass, config):
-    """ Thanks to pydispatcher being globally available in the application, we can hook into zwave here """
+    """ Set up our service call interface, a refresher task that stops itself and hook into the zwave events """
     global CODEGROUP
-    stopcall = None
 
     hass.services.register(DOMAIN, "setusercode", set_user_code,
                 { 'description': "Sets a user code on all locks",
@@ -63,21 +62,21 @@ def setup(hass, config):
             CODEGROUP.add_entities([ZWaveUserCode(value)]) 
 
     def refresh_unknown(now):
-        """ OZW/refresh_all_user_codes doesn't always work with my locks, keep at it until we have status """
-        _LOGGER.debug("refresh at {}".format(now))
+        """
+            We need to query ZWave UserCode values that we don't have any previous state for to see if they
+            are available or occupied.  Using OZW Option RefreshAllUserCodes doesn't always work for me.
+        """
         for code in CODEGROUP.entities.values():
             if code.state == STATE_UNKNOWN: 
                 # Make a single request now, don't spam zwave network
                 code.refresh()
                 return
         # Everything has a status, stop the listener
-        _LOGGER.debug("stopcall is {}".format(stopcall))
-        stopcall()
+        CODEGROUP.stoprefresher()
 
     def start_refresher(event):
         """ Don't start the refresher until the zwave network is ready to go """
-        pass
-        #stopcall = track_time_change(hass, refresh_unknown, seconds='0')
+        CODEGROUP.stoprefresher = track_time_change(hass, refresh_unknown, second=0)
 
     # Connect up to the zwave network
     CODEGROUP = EntityComponent(_LOGGER, DOMAIN, hass)

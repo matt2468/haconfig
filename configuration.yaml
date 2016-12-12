@@ -19,7 +19,9 @@ logger:
   default: info
   logs:
     homeassistant.core: warning
+    homeassistant.components.sensor.command_line: warning
     custom_components: debug
+    custom_components.bwio: info
 
 http:
   api_password: !secret http_password
