@@ -1,3 +1,4 @@
+# Core components and setup
 homeassistant:
   name: Home
   latitude: 47.7396
@@ -23,42 +24,32 @@ logger:
     custom_components: debug
     custom_components.bwio: info
 
-http:
-  api_password: !secret http_password
-  ssl_certificate: !secret ssl_certificate
-  ssl_key: !secret ssl_key
-  #ssl_peer_authority: !secret ssl_peer_authority
-
+http: !include http.yaml
+recorder: { purge_days: 14 }
 frontend:
-conversation:
-history:
 logbook:
 sun:
-recorder: { purge_days: 14 }
 
+
+# ZWave setup
 zwave:
   usb_path: /dev/zwave
   config_path: /home/pi/.homeassistant/ozwconfig
   polling_interval: 60000
   customize:
-    binary_sensor.multisensor_sensor_18_0:     { ignored: true }
-    sensor.multisensor_temperature_18_1:       { ignored: true }
-    sensor.multisensor_luminance_18_3:         { ignored: true }
-    sensor.multisensor_relative_humidity_18_5: { ignored: true }
     sensor.thermostat_temperature_9_1: { polling_intensity: 1 }
     climate.thermostat_heating_1_9_1:  { polling_intensity: 1 }
 
-bwio:
-  port: /dev/bwio
 
+# My custom zwave lock interface bits
 usercode:
 locklogger:
-
 panel_custom:
   - name: locks
     sidebar_title: ZWave Locks
     sidebar_icon: mdi:lock
 
+# Generic sensors I like to keep an eye on for now
 sensor:
   - platform: systemmonitor
     resources:
@@ -69,6 +60,11 @@ sensor:
     command: "cat /sys/class/thermal/thermal_zone0/temp"
     unit_of_measurement: "°C"
     value_template: '{{ value | multiply(0.001) }}'
+
+
+# This is all of the I/O from my custom board
+bwio:
+  port: /dev/bwio
 
 binary_sensor:
   - platform: bwio
@@ -96,6 +92,8 @@ switch:
       11: garagedoor
       15: alarm
 
+
+# The garage door switch needs to toggle on and off, do it here
 script:
   garage_door:
     sequence:
@@ -106,8 +104,10 @@ script:
       - service: switch.turn_off
         data: { entity_id: switch.garagedoor }
 
+# Deal with bizzare reports from ZWave Thermostat
 shell_command:
   cleantemps: './cleantemps.py'
+
 
 group: !include groups.yaml
 automation: !include automation.yaml
