@@ -19,6 +19,7 @@ _LOGGER = logging.getLogger(__name__)
 BOARD = None
 DOMAIN = 'bwio'
 CONF_PINS = 'pins'
+CONF_HIDE = 'hide'
 
 CONFIG_SCHEMA = vol.Schema({
     DOMAIN: vol.Schema({
@@ -28,11 +29,13 @@ CONFIG_SCHEMA = vol.Schema({
 
 BWIO_OUTPUT_SCHEMA = vol.Schema ({
     vol.Required(CONF_PLATFORM): DOMAIN,
+    vol.Optional(CONF_HIDE, default=False): cv.boolean,
     vol.Required(CONF_PINS): vol.Schema({ cv.positive_int: cv.string })
 })
 
 BWIO_INPUT_SCHEMA = vol.Schema ({
     vol.Required(CONF_PLATFORM): DOMAIN,
+    vol.Optional(CONF_HIDE, default=False): cv.boolean,
     vol.Required(CONF_PINS): vol.Schema({
          cv.positive_int: [ cv.string ] }) # can voluptous do array with different types?
 })
@@ -60,15 +63,15 @@ def setup_pins(buildfunc, hass, config, add_devices, discovery_info=None):
         return False
 
     # list comprehension: build each pin device from config and pass to add_devices
-    add_devices(buildfunc(pin, arg) for pin, arg in config.get(CONF_PINS).items())
+    add_devices(buildfunc(pin, arg, config[CONF_HIDE]) for pin, arg in config.get(CONF_PINS).items())
 
-def create_input(pin, arg):
-    dev = BWIOInput(BOARD, pin, arg[0], arg[1]) # name and sensortype
+def create_input(pin, arg, hide):
+    dev = BWIOInput(BOARD, pin, arg[0], arg[1], hide) # args = name and sensortype
     BOARD._inputs.append(dev)
     return dev
 
-def create_output(pin, arg):
-    dev = BWIOOutput(BOARD, pin, arg)
+def create_output(pin, arg, hide):
+    dev = BWIOOutput(BOARD, pin, arg, hide)
     BOARD._outputs.append(dev)
     return dev
 
@@ -141,11 +144,12 @@ class BWIOBoard(serial.threaded.LineReader):
 class BWIOOutput(SwitchDevice):
     """ Switch interface to an output pin """
 
-    def __init__(self, parent, pin, name):
+    def __init__(self, parent, pin, name, hide):
         _LOGGER.debug("Create %s on output pin %d" % (name, pin))
         self._parent = parent
         self._pin = pin
         self._name = name
+        self._hidden = hide
         self._state = None
 
     def turn_on(self, **kwargs):   self._parent.set_output(self._pin, 1)
@@ -158,17 +162,20 @@ class BWIOOutput(SwitchDevice):
     def name(self):                return self._name
     @property
     def is_on(self):               return self._state
+    @property
+    def hidden(self):              return self._hidden
 
 
 class BWIOInput(BinarySensorDevice):
     """ Binary sensor interface to an input pin """
 
-    def __init__(self, parent, pin, name, sensortype):
+    def __init__(self, parent, pin, name, sensortype, hide):
         _LOGGER.debug("Create %s on input pin %d, type %s" % (name, pin, sensortype))
         self._parent = parent
         self._pin = pin
         self._name = name
         self._type = sensortype
+        self._hidden = hide
         self._state = None
 
     def update(self):              self._parent.ping_input()
@@ -181,5 +188,6 @@ class BWIOInput(BinarySensorDevice):
     def name(self):                return self._name
     @property
     def is_on(self):               return self._state
-
+    @property
+    def hidden(self):              return self._hidden
 

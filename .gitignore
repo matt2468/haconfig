@@ -7,4 +7,5 @@ ozwconfig
 *.sqlite
 *.txt
 *.xml
+*.swp
 __pycache__

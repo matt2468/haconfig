@@ -77,6 +77,7 @@ bwio:
 
 binary_sensor:
   - platform: bwio
+    hide: true    # Hide from normal UI bits, only display on Alarm page
     pins: 
        0:  [ littlewindow,     opening ]
        1:  [ diningwindow,     opening ]

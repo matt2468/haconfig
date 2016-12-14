@@ -86,7 +86,8 @@ Polymer({
                 }
 
                 if (entity.domain == 'lock') {
-                    objs[key].name = eid;
+                    objs[key].name = entity.attributes.friendly_name.replace("Locked", "");
+                    objs[key].location = entity.attributes.location;
                     objs[key].battery = entity.attributes.battery_level;
                 }
                 if ((entity.domain == 'usercode') && (entity.state != 'unassigned')) {
