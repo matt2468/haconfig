@@ -1,0 +1,21 @@
+platform: bwalarm
+name: House Alarm
+pending_time: 30
+trigger_time: 300
+immediate:
+    - binary_sensor.backdoor
+    - binary_sensor.bedroomslider
+    - binary_sensor.diningwindow
+    - binary_sensor.littlewindow
+    - binary_sensor.livingroomwindow
+    - binary_sensor.officewindow
+    - binary_sensor.patioslider
+    - binary_sensor.primarymotion
+delayed:
+    - binary_sensor.frontdoor
+    - binary_sensor.garagedoor
+notathome:
+    - binary_sensor.primarymotion
+alarm:
+    - switch.alarm
+

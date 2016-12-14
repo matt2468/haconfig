@@ -1,0 +1,89 @@
+<dom-module id='ha-panel-alarm'>
+    <style include="ha-style iron-flex iron-flex-factors">
+      .content {
+        padding: 24px;
+      }
+      .panel {
+        padding: 10px;
+      }
+      .box{
+        max-width: 300px;
+      }
+      .title {
+        text-align: center;
+        font-size:  1.9em;
+        font-weight: 300;
+      }
+    </style>
+
+    <template>
+      <app-header-layout has-scrolling-region>
+        <app-header fixed>
+            <app-toolbar>
+                <ha-menu-button narrow='[[narrow]]' show-menu='[[showMenu]]'></ha-menu-button>
+                <div main-title>Alarm</div>
+            </app-toolbar>
+        </app-header>
+
+        <div class='content'>
+        <div class='panel'>
+            <ha-state-label-badge hass='[[hass]]' state='[[alarm]]'></ha-state-label-badge>
+            <paper-button on-tap='armhome' raised>Arm Home</paper-button>
+            <paper-button on-tap='armaway' raised>Arm Away</paper-button>
+        </div>
+
+        <div class='panel box'>
+            <div class='title'>Inactive Sensors</div>
+            <div class='border'>
+            <template is='dom-repeat' items='[[watching]]' as='entity'>
+                <state-card-display state-obj="[[entity]]" hass='[[hass]]'></state-card-display>
+            </template>
+            </div>
+        </div>
+        </div>
+      </app-header-layout>
+    </template>
+</dom-module>
+
+<script>
+
+Polymer({
+  is: 'ha-panel-alarm',
+  properties: {
+    // things that appear in all the other panels 
+    hass:     { type: Object },
+    panel:    { type: Object },
+    narrow:   { type: Boolean, value: false },
+    showMenu: { type: Boolean, value: false },
+
+    alarm: {
+      type: Object,
+      computed: 'computeBaseAlarm(hass, panel)',
+    },
+
+    watching: {
+      type: Array,
+    },
+
+    armed: {
+      type: Array,
+    },
+  },
+  // End of properties
+
+  watchsignals: function(hass, alarm) {
+     getter = [  this.hass.entityGetters.entityMap, 
+          function(map) { return map.valueSeq().filter(x => alarm.attributes.listento.indexOf(x.entityId) > -1).toArray(); }
+       ]
+     this.watching = this.hass.reactor.evaluate(getter);
+     this.stopob = this.hass.reactor.observe(getter, function(val) { this.watching = val; }.bind(this));
+  },
+
+  computeBaseAlarm: function (hass, panel) {
+     alarm = hass.reactor.evaluate(hass.entityGetters.byId(panel.config.alarmid));
+     this.watchsignals(hass, alarm);
+     return alarm;
+  },
+});
+</script>
+

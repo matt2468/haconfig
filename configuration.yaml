@@ -25,8 +25,12 @@ logger:
     custom_components.bwio: info
 
 http: !include http.yaml
+group: !include groups.yaml
+automation: !include automation.yaml
+alarm_control_panel: !include alarm.yaml
 recorder: { purge_days: 14 }
 frontend:
+history:
 logbook:
 sun:
 
@@ -48,6 +52,11 @@ panel_custom:
   - name: locks
     sidebar_title: ZWave Locks
     sidebar_icon: mdi:lock
+  - name: alarm
+    sidebar_title: Alarm
+    sidebar_icon: mdi:security-home
+    config:
+      alarmid: alarm_control_panel.house_alarm
 
 # Generic sensors I like to keep an eye on for now
 sensor:
@@ -108,7 +117,4 @@ script:
 shell_command:
   cleantemps: './cleantemps.py'
 
-
-group: !include groups.yaml
-automation: !include automation.yaml
 
