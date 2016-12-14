@@ -1,5 +1,5 @@
 platform: bwalarm
-name: House Alarm
+name: House
 pending_time: 30
 trigger_time: 300
 immediate:

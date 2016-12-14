@@ -56,7 +56,7 @@ panel_custom:
     sidebar_title: Alarm
     sidebar_icon: mdi:security-home
     config:
-      alarmid: alarm_control_panel.house_alarm
+      alarmid: alarm_control_panel.house
 
 # Generic sensors I like to keep an eye on for now
 sensor:

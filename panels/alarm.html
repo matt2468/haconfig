@@ -1,18 +1,37 @@
 <dom-module id='ha-panel-alarm'>
     <style include="ha-style iron-flex iron-flex-factors">
+      app-header-layout {
+        background-color: #E5E5E5;
+      }
+
       .content {
-        padding: 24px;
+        padding: 15px;
       }
-      .panel {
-        padding: 10px;
+
+      :host ::content .badge-container.ha-label-badge {
+        margin-left: 16px;
+        margin-bottom: 0px;
       }
-      .box{
-        max-width: 300px;
+
+      .actions {
+        margin-left: 20px;
+        @apply(--layout-self-center);
       }
+
+      .box {
+        max-width: 350px;
+        border-radius: 3px;
+        background-color: white;
+        margin-bottom: 10px;
+        padding: 15px;
+
+        @apply(--shadow-elevation-4dp);
+        opacity: var(--dark-primary-opacity);
+      }
+
       .title {
-        text-align: center;
-        font-size:  1.9em;
-        font-weight: 300;
+        @apply(--paper-font-headline);
+        margin: 10px;
       }
     </style>
 
@@ -26,20 +45,25 @@
         </app-header>
 
         <div class='content'>
-        <div class='panel'>
-            <ha-state-label-badge hass='[[hass]]' state='[[alarm]]'></ha-state-label-badge>
-            <paper-button on-tap='armhome' raised>Arm Home</paper-button>
-            <paper-button on-tap='armaway' raised>Arm Away</paper-button>
+        <div class='box horizontal layout'>
+          <ha-state-label-badge hass='[[hass]]' state='[[alarm]]'></ha-state-label-badge>
+          <div class='actions'>
+            <template is='dom-if' if='[[isdisarmed(alarm)]]'>
+                <paper-button on-tap='armhome' raised>Arm Home</paper-button>
+                <paper-button on-tap='armaway' raised>Arm Away</paper-button>
+            </template>
+            <template is='dom-if' if='[[!isdisarmed(alarm)]]'>
+                <paper-button on-tap='disarm' raised>Disarm</paper-button>
+            </template>
+          </div>
         </div>
 
-        <div class='panel box'>
-            <div class='title'>Inactive Sensors</div>
-            <div class='border'>
-            <template is='dom-repeat' items='[[watching]]' as='entity'>
-                <state-card-display state-obj="[[entity]]" hass='[[hass]]'></state-card-display>
+        <div class='box'>
+          <div class='title'>Inactive Sensors</div>
+            <template is='dom-repeat' items='[[signals]]' as='entity'>
+              <state-card-display state-obj="[[entity]]" hass='[[hass]]'></state-card-display>
             </template>
-            </div>
-        </div>
+          </div>
         </div>
       </app-header-layout>
     </template>
@@ -55,35 +79,38 @@ Polymer({
     panel:    { type: Object },
     narrow:   { type: Boolean, value: false },
     showMenu: { type: Boolean, value: false },
-
-    alarm: {
-      type: Object,
-      computed: 'computeBaseAlarm(hass, panel)',
-    },
-
-    watching: {
-      type: Array,
-    },
-
-    armed: {
-      type: Array,
-    },
-  },
-  // End of properties
-
-  watchsignals: function(hass, alarm) {
-     getter = [  this.hass.entityGetters.entityMap, 
-          function(map) { return map.valueSeq().filter(x => alarm.attributes.listento.indexOf(x.entityId) > -1).toArray(); }
-       ]
-     this.watching = this.hass.reactor.evaluate(getter);
-     this.stopob = this.hass.reactor.observe(getter, function(val) { this.watching = val; }.bind(this));
+    // things specific to this alarm panel
+    alarm:    { type: Object },
+    signals:  { type: Array },
+    armed:    { type: Array },
+    // Hold our unobservers
+    cleanup:  { type: Array, value: [] },
   },
 
-  computeBaseAlarm: function (hass, panel) {
-     alarm = hass.reactor.evaluate(hass.entityGetters.byId(panel.config.alarmid));
-     this.watchsignals(hass, alarm);
-     return alarm;
+  observers: [ 'updateAlarm(hass, panel)' ],
+  isdisarmed: function(alarm) { return alarm.state == "disarmed"; },
+  docall:    function(action) { this.hass.serviceActions.callService('alarm_control_panel', action, {'entity_id': this.alarm.entityId})},
+
+  armaway: function() { this.docall('alarm_arm_away'); },
+  armhome: function() { this.docall('alarm_arm_home'); },
+  disarm:  function() { this.docall('alarm_disarm');   },
+
+  // Polymer gaurantees that this won't bet called util hass and panel are both defined
+  updateAlarm: function(hass, panel) {
+    alarmgetter  = this.hass.entityGetters.byId(panel.config.alarmid);
+    this.alarm = hass.reactor.evaluate(alarmgetter);
+    this.cleanup.push(hass.reactor.observe(alarmgetter, function(val) { this.alarm = val; }.bind(this)));
+
+    signalgetter = [  this.hass.entityGetters.entityMap, 
+          function(map) { return map.valueSeq().filter(x => this.alarm.attributes.listento.indexOf(x.entityId) > -1).toArray(); }.bind(this)]
+    this.signals = this.hass.reactor.evaluate(signalgetter);
+    this.cleanup.push(hass.reactor.observe(signalgetter, function(val) { this.signals = val; }.bind(this)));
   },
+
+  detached: function() {
+    this.cleanup.forEach(func => func());
+    this.cleanup = [];
+  }
 });
 </script>
 
