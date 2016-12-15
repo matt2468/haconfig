@@ -10,6 +10,9 @@
       .content td:first-child {
         text-align: right;
       }
+      .title {
+        @apply(--paper-font-headline);
+      }
       .warning {
         color: red;
         font-weight: bold;
@@ -26,10 +29,9 @@
         </app-header>
 
         <div class='content'>
-            <p>Your current locks and codes</p>
             <table>
             <template is='dom-repeat' items='[[locks]]' as='lock'>
-                <tr><th colspan='2'>[[lock.name]] (Batt [[lock.battery]]%)</th></tr>
+                <tr><td colspan=2 class='title'>[[lock.name]] <iron-icon icon="mdi:battery[[iconlvl(lock.battery)]]" item-icon></iron-icon></td></tr>
                 <template is='dom-repeat' items='[[lock.codes]]' as='code'>
                     <tr>
                         <td>[[code.index]]</td>
@@ -125,6 +127,18 @@ Polymer({
   },
   // End of properties
 
+  iconlvl: function(lvl) { 
+          if (lvl == 100) return "";
+     else if (lvl > 90)   return "-90";
+     else if (lvl > 80)   return "-80";
+     else if (lvl > 70)   return "-70";
+     else if (lvl > 60)   return "-60";
+     else if (lvl > 50)   return "-50";
+     else if (lvl > 40)   return "-40";
+     else if (lvl > 30)   return "-30";
+     else if (lvl > 20)   return "-20";
+                          return "-10";
+  },
   doshowoldname: function(c) { return c == 'clearusercode' || c == 'renameusercode'; },
   doshownewname: function(c) { return c == 'setusercode'   || c == 'renameusercode'; },
   doshowcode:    function(c) { return c == 'setusercode'; },

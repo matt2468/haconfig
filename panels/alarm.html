@@ -8,23 +8,26 @@
         padding: 15px;
       }
 
+      ha-label-badge {
+        --ha-label-badge-color: rgb(223, 76, 30);
+      }
+
       :host ::content .badge-container.ha-label-badge {
-        margin-left: 16px;
-        margin-bottom: 0px;
+        margin: 0px 16px;
       }
 
       .actions {
         margin-left: 20px;
+        min-width: 200px;
         @apply(--layout-self-center);
       }
 
       .box {
         max-width: 350px;
-        border-radius: 3px;
-        background-color: white;
         margin-bottom: 10px;
         padding: 15px;
-
+        background-color: white;
+        border-radius: 3px;
         @apply(--shadow-elevation-4dp);
         opacity: var(--dark-primary-opacity);
       }
@@ -33,6 +36,18 @@
         @apply(--paper-font-headline);
         margin: 10px;
       }
+
+      .headsup {
+        margin: 5px;
+        text-align: center;
+      } 
+
+      .oksign {
+        --iron-icon-fill-color: green;
+        --iron-icon-stroke-color: green;
+        margin: 10px auto;
+      }
+
     </style>
 
     <template>
@@ -44,9 +59,10 @@
             </app-toolbar>
         </app-header>
 
-        <div class='content'>
+      <div class='content'>
         <div class='box horizontal layout'>
-          <ha-state-label-badge hass='[[hass]]' state='[[alarm]]'></ha-state-label-badge>
+          <ha-label-badge icon='[[computeIcon(alarm.state)]]' label='[[computeLabel(alarm.state)]]' description='[[alarm.entityDisplay]]'></ha-label-badge>
+
           <div class='actions'>
             <template is='dom-if' if='[[isdisarmed(alarm)]]'>
                 <paper-button on-tap='armhome' raised>Arm Home</paper-button>
@@ -55,16 +71,47 @@
             <template is='dom-if' if='[[!isdisarmed(alarm)]]'>
                 <paper-button on-tap='disarm' raised>Disarm</paper-button>
             </template>
+   
+            <div class='headsup'>
+              <template is='dom-if' if='[[issecure(headsup)]]'>
+                 <div class='oksign'>
+                   <iron-icon class='greenicon' icon="mdi:checkbox-marked-circle" item-icon></iron-icon>
+                   Secure
+                 </div>
+              </template>
+              <template is='dom-if' if='[[!issecure(headsup)]]'>
+                <template is='dom-repeat' items='[[openheadsup(headsup)]]' as='entity'>
+                  <state-card-display state-obj="[[entity]]" hass='[[hass]]'></state-card-display>
+                </template>
+              </template>
+            </div>
           </div>
         </div>
 
+       <div class='panels layout'>
         <div class='box'>
-          <div class='title'>Inactive Sensors</div>
-            <template is='dom-repeat' items='[[signals]]' as='entity'>
+            <div class='title'>Delayed Alarms</div>
+            <template is='dom-repeat' items='[[delayed]]' as='entity'>
               <state-card-display state-obj="[[entity]]" hass='[[hass]]'></state-card-display>
             </template>
-          </div>
         </div>
+
+        <div class='box'>
+            <div class='title'>Immediate Alarms</div>
+            <template is='dom-repeat' items='[[immediate]]' as='entity'>
+              <state-card-display state-obj="[[entity]]" hass='[[hass]]'></state-card-display>
+            </template>
+        </div>
+
+        <div class='box'>
+            <div class='title'>Inactive Sensors</div>
+            <template is='dom-repeat' items='[[ignored]]' as='entity'>
+              <state-card-display state-obj="[[entity]]" hass='[[hass]]'></state-card-display>
+            </template>
+        </div>
+       </div>
+      </div>
+
       </app-header-layout>
     </template>
 </dom-module>
@@ -81,13 +128,15 @@ Polymer({
     showMenu: { type: Boolean, value: false },
     // things specific to this alarm panel
     alarm:    { type: Object },
-    signals:  { type: Array },
-    armed:    { type: Array },
+    immediate:{ type: Array },
+    delayed:  { type: Array },
+    ignored:  { type: Array },
+    headsup:  { type: Array },
     // Hold our unobservers
     cleanup:  { type: Array, value: [] },
   },
 
-  observers: [ 'updateAlarm(hass, panel)' ],
+  observers: [ 'onPanelUpdate(hass, panel)', 'onAlarmUpdate(alarm)' ],
   isdisarmed: function(alarm) { return alarm.state == "disarmed"; },
   docall:    function(action) { this.hass.serviceActions.callService('alarm_control_panel', action, {'entity_id': this.alarm.entityId})},
 
@@ -95,16 +144,71 @@ Polymer({
   armhome: function() { this.docall('alarm_arm_home'); },
   disarm:  function() { this.docall('alarm_disarm');   },
 
-  // Polymer gaurantees that this won't bet called util hass and panel are both defined
-  updateAlarm: function(hass, panel) {
-    alarmgetter  = this.hass.entityGetters.byId(panel.config.alarmid);
-    this.alarm = hass.reactor.evaluate(alarmgetter);
-    this.cleanup.push(hass.reactor.observe(alarmgetter, function(val) { this.alarm = val; }.bind(this)));
+  displayTapped: function() {
+    this.async(function () { this.hass.moreInfoActions.selectEntity(this.headsup[0].entityId); }.bind(this), 1);
+  },
 
-    signalgetter = [  this.hass.entityGetters.entityMap, 
-          function(map) { return map.valueSeq().filter(x => this.alarm.attributes.listento.indexOf(x.entityId) > -1).toArray(); }.bind(this)]
-    this.signals = this.hass.reactor.evaluate(signalgetter);
-    this.cleanup.push(hass.reactor.observe(signalgetter, function(val) { this.signals = val; }.bind(this)));
+  computeIcon: function (state) {
+     if (state === 'pending') {
+       return 'mdi:clock-fast';
+     } else if (state === 'armed_away') {
+       return 'mdi:nature';
+     } else if (state === 'armed_home') {
+       return 'mdi:home-variant';
+     } else if (state === 'triggered') {
+       return 'mdi:alert-circle';
+     }
+     return 'mdi:bell-outline';
+  },
+
+  computeLabel: function (state) {
+     if (state === 'pending') {
+       return 'pend';
+     } else if (state === 'armed_away' || state === 'armed_home') {
+       return 'armed';
+     } else if (state === 'triggered') {
+       return 'trig';
+     }
+     return 'disarm';
+  },
+
+  issecure: function(headsup) {
+     return headsup.reduce(function (a, e) { return a && e.state != 'on' && e.state != 'unlocked'; }, true);
+  },
+
+  openheadsup: function(headsup) {
+     return headsup.filter(function (e) { return e.state == 'on' || e.state == 'unlocked'; });
+  },
+
+
+  // Observer: polymer gaurantees that this won't be called util hass and panel are both defined
+  onPanelUpdate: function(hass, panel) {
+    this.alarm = hass.reactor.evaluate(hass.entityGetters.byId(panel.config.alarmid));
+  },
+
+  // When something about the alarm updates, redo our lists
+  onAlarmUpdate: function(alarm) {
+    console.log("Alarm update");
+    this.detached();
+    alarmgetter = hass.entityGetters.byId(alarm.entityId);
+    this.cleanup.push(hass.reactor.observe(alarmgetter, function(val) { this.alarm = val; }.bind(this)));
+    this.updateList(hass, alarm, 'immediate');
+    this.updateList(hass, alarm, 'delayed');
+    this.updateList(hass, alarm, 'ignored');
+    this.updateList(hass, alarm, 'headsup');
+  },
+
+  // Set the list of entities based on each current list of entity ids provided
+  updateList: function(hass, alarm, key) {
+    getter = [
+        this.hass.entityGetters.entityMap, 
+        function(map) { 
+           tocheck = alarm.attributes[key] || [];
+           return map.valueSeq().filter(x => tocheck.indexOf(x.entityId) > -1).toArray();
+        }.bind(this)
+    ];
+    this[key] = hass.reactor.evaluate(getter);
+    this.cleanup.push(hass.reactor.observe(getter, function(val) { this[key] = val; }.bind(this)));
   },
 
   detached: function() {

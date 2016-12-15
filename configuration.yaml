@@ -24,8 +24,15 @@ logger:
     custom_components: debug
     custom_components.bwio: info
 
+group:
+  outdoorlights:
+    name: Outdoor Lights
+    entities:
+      - switch.drivewaylight_switch_12_0
+      - switch.frontdoorlight_switch_3_0
+
+
 http: !include http.yaml
-group: !include groups.yaml
 automation: !include automation.yaml
 alarm_control_panel: !include alarm.yaml
 recorder: { purge_days: 14 }
@@ -36,7 +43,7 @@ sun:
 
 
 # ZWave setup
-zwave:
+xzwave:
   usb_path: /dev/zwave
   config_path: /home/pi/.homeassistant/ozwconfig
   polling_interval: 60000
@@ -77,7 +84,6 @@ bwio:
 
 binary_sensor:
   - platform: bwio
-    hide: true    # Hide from normal UI bits, only display on Alarm page
     pins: 
        0:  [ littlewindow,     opening ]
        1:  [ diningwindow,     opening ]
@@ -99,23 +105,22 @@ binary_sensor:
 switch:
   - platform: bwio
     pins: 
-      11: garagedoor
+      11: garagedoorline
       15: alarm
 
-
-# The garage door switch needs to toggle on and off, do it here
+# The garage door 'switch' needs to toggle on and off, do it here
 script:
-  garage_door:
+  garagedoor:
     sequence:
       - service: switch.turn_on
-        data: { entity_id: switch.garagedoor }
+        data: { entity_id: switch.garagedoorline }
       - delay:
           milliseconds: 10
       - service: switch.turn_off
-        data: { entity_id: switch.garagedoor }
+        data: { entity_id: switch.garagedoorline }
 
-# Deal with bizzare reports from ZWave Thermostat
+
+# Deal with bizzare reports from my ZWave Thermostat
 shell_command:
   cleantemps: './cleantemps.py'
-
 

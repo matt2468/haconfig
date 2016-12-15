@@ -161,7 +161,7 @@ class BWIOOutput(SwitchDevice):
     @property
     def name(self):                return self._name
     @property
-    def is_on(self):               return self._state
+    def is_on(self):               return self._state != 0
     @property
     def hidden(self):              return self._hidden
 
@@ -187,7 +187,7 @@ class BWIOInput(BinarySensorDevice):
     @property
     def name(self):                return self._name
     @property
-    def is_on(self):               return self._state
+    def is_on(self):               return self._state != 0
     @property
     def hidden(self):              return self._hidden
 
