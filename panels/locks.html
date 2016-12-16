@@ -14,8 +14,22 @@
         @apply(--paper-font-headline);
       }
       .warning {
-        color: red;
+        color: #A00;
         font-weight: bold;
+      }
+      .batt100, .batt90, .batt80, .batt70 {
+        color: #0A0;
+      }
+      .batt60, .batt50, .batt40  {
+        color: #FC0;
+      }
+      .batt30, .batt20, .batt10  { 
+        color: #900;
+      }
+      .label {
+        position: relative;
+        left: -0.5em;
+        font-size: 0.5em;
       }
     </style>
 
@@ -31,7 +45,11 @@
         <div class='content'>
             <table>
             <template is='dom-repeat' items='[[locks]]' as='lock'>
-                <tr><td colspan=2 class='title'>[[lock.name]] <iron-icon icon="mdi:battery[[iconlvl(lock.battery)]]" item-icon></iron-icon></td></tr>
+                <tr><td colspan=2 class='title'>
+                    [[lock.name]]
+                    <iron-icon class$='[[iconclass(lock.battery)]]' icon="mdi:battery[[iconlvl(lock.battery)]]" item-icon></iron-icon>
+                    <span class='label'>[[lock.battery]]%</span>
+                </td></tr>
                 <template is='dom-repeat' items='[[lock.codes]]' as='code'>
                     <tr>
                         <td>[[code.index]]</td>
@@ -137,8 +155,22 @@ Polymer({
      else if (lvl > 40)   return "-40";
      else if (lvl > 30)   return "-30";
      else if (lvl > 20)   return "-20";
-                          return "-10";
+                          return "-10"; // 19 and below
   },
+
+  iconclass: function(lvl) { 
+          if (lvl == 100) return "batt100";
+     else if (lvl > 90)   return "batt90";
+     else if (lvl > 80)   return "batt80";
+     else if (lvl > 70)   return "batt70";
+     else if (lvl > 60)   return "batt60";
+     else if (lvl > 50)   return "batt50";
+     else if (lvl > 40)   return "batt40";
+     else if (lvl > 30)   return "batt30";
+     else if (lvl > 20)   return "batt20";
+                          return "batt10"; // 19 and below
+  },
+
   doshowoldname: function(c) { return c == 'clearusercode' || c == 'renameusercode'; },
   doshownewname: function(c) { return c == 'setusercode'   || c == 'renameusercode'; },
   doshowcode:    function(c) { return c == 'setusercode'; },
