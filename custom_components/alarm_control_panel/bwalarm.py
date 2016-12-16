@@ -63,7 +63,7 @@ def async_setup_platform(hass, config, async_add_devices, discovery_info=None):
 class BWAlarm(alarm.AlarmControlPanel):
 
     def __init__(self, hass, config):
-        """ Initalize the manual alarm panel """
+        """ Initalize the alarm system """
         self._hass         = hass
         self._name         = config[CONF_NAME]
         self._immediate    = set(config.get(CONF_IMMEDIATE, []))
@@ -165,20 +165,20 @@ class BWAlarm(alarm.AlarmControlPanel):
            The possible states and things that can change our state work are:
                  Actions:  isensor dsensor timeout arm_home arm_away disarm trigger
            States: 
-             disarmed         X       X       X      armh     pend     x     trig
+             disarmed         X       X       X      armh     pend     *     trig
              pending(T1)      X       X      arma     X        X      dis    trig
              armed(h/a)      trig    warn     X       X        X      dis    trig
              warning(T1)      X       X      trig     X        X      dis    trig
-             triggered(T2)    X       X      last     X        X      dis     x
+             triggered(T2)    X       X      last     X        X      dis     *
 
            As the only non-timed states are disarmed, armed_home and armed_away,
            they are the only ones we can return to after an alarm.
         """
         old = self._state
 
+        # Update state if applicable
         if event == Events.Disarm:
             self._state = STATE_ALARM_DISARMED
-            self.clearsignals()
         elif event == Events.Trigger:
             self._state = STATE_ALARM_TRIGGERED 
         elif old == STATE_ALARM_DISARMED:
@@ -218,6 +218,7 @@ class BWAlarm(alarm.AlarmControlPanel):
                 self.setsignals(True)
             elif new == STATE_ALARM_DISARMED:
                 self._returnto = new
+                self.clearsignals()
 
             # Things to do on leaving state
             if old == STATE_ALARM_WARNING or old == STATE_ALARM_PENDING:

@@ -73,11 +73,11 @@
 
           <div class='actions'>
             <template is='dom-if' if='[[isdisarmed(alarm)]]'>
-                <paper-button on-tap='armhome' raised>Arm Home</paper-button>
-                <paper-button on-tap='armaway' raised>Arm Away</paper-button>
+                <paper-button on-tap='callService' data-call='alarm_arm_home' raised>Arm Home</paper-button>
+                <paper-button on-tap='callService' data-call='alarm_arm_away' raised>Arm Away</paper-button>
             </template>
             <template is='dom-if' if='[[!isdisarmed(alarm)]]'>
-                <paper-button on-tap='disarm' raised>Disarm</paper-button>
+                <paper-button on-tap='callService' data-call='alarm_disarm' raised>Disarm</paper-button>
             </template>
    
             <div class='summary'>
@@ -132,6 +132,7 @@
 
 Polymer({
   is: 'ha-panel-alarm',
+
   properties: {
     // things that appear in all the other panels 
     hass:     { type: Object },
@@ -148,25 +149,19 @@ Polymer({
     cleanup:    { type: Array, value: [] },
   },
 
+  // Polymer observers definition
   observers: [ 'onPanelUpdate(hass, panel)', 'onAlarmUpdate(alarm)' ],
-  isdisarmed: function(alarm) { return alarm.state == "disarmed"; },
-  docall:    function(action) { this.hass.serviceActions.callService('alarm_control_panel', action, {'entity_id': this.alarm.entityId})},
 
-  armaway: function() { this.docall('alarm_arm_away'); },
-  armhome: function() { this.docall('alarm_arm_home'); },
-  disarm:  function() { this.docall('alarm_disarm');   },
-
-  entityTapped: function (ev) {
-    ev.stopPropagation();
-    var entityId = ev.target.getAttribute('data-entity');
-    this.async(function () { this.hass.moreInfoActions.selectEntity(entityId); }.bind(this), 1);
-  },
+  // Helpers to figure out what to display 
+  isdisarmed:  function(alarm) { return alarm.state == "disarmed"; },
+  issecure:    function(all)   { return this.opensensors(all).length == 0; },
+  opensensors: function(all)   { return all.filter(function (e) { return e.state == 'on' || e.state == 'unlocked'; }); },
 
   computeIcon: function (state) {
      switch (state) {
-        case 'disarmed':   return 'mdi:bell-sleep';
-        case 'armed_away': return 'mdi:nature';
-        case 'armed_home': return 'mdi:home';
+        case 'disarmed':   return 'mdi:shield-outline';
+        case 'armed_away': return 'mdi:security-home';
+        case 'armed_home': return 'mdi:security-home';
         case 'pending':    return 'mdi:walk';
         case 'warning':    return 'mdi:run';
         case 'triggered':  return 'mdi:alert-circle';
@@ -186,14 +181,18 @@ Polymer({
      return state;
   },
 
-  issecure: function(all) {
-     return this.opensensors(all).length == 0; 
+  // Responding to user inputs
+  callService: function(ev) {
+    ev.stopPropagation();
+    var call = ev.target.getAttribute('data-call');
+    this.hass.serviceActions.callService('alarm_control_panel', call, {'entity_id': this.alarm.entityId})
   },
 
-  opensensors: function(all) {
-     return all.filter(function (e) { return e.state == 'on' || e.state == 'unlocked'; });
+  entityTapped: function (ev) {
+    ev.stopPropagation();
+    var entityId = ev.target.getAttribute('data-entity');
+    this.async(function () { this.hass.moreInfoActions.selectEntity(entityId); }.bind(this), 1);
   },
-
 
   // Observer: polymer gaurantees that this won't be called util hass and panel are both defined
   onPanelUpdate: function(hass, panel) {
@@ -202,18 +201,17 @@ Polymer({
 
   // When something about the alarm updates, redo our lists
   onAlarmUpdate: function(alarm) {
-    console.log("Alarm update");
-    this.detached();
+    this.detached(); // reset ourselves to a starting point
     alarmgetter = hass.entityGetters.byId(alarm.entityId);
     this.cleanup.push(hass.reactor.observe(alarmgetter, function(val) { this.alarm = val; }.bind(this)));
-    this.updateList(hass, alarm, 'immediate');
-    this.updateList(hass, alarm, 'delayed');
-    this.updateList(hass, alarm, 'ignored');
-    this.updateList(hass, alarm, 'allsensors');
+    this.watchList(hass, alarm, 'immediate');
+    this.watchList(hass, alarm, 'delayed');
+    this.watchList(hass, alarm, 'ignored');
+    this.watchList(hass, alarm, 'allsensors');
   },
 
   // Set the list of entities based on each current list of entity ids provided
-  updateList: function(hass, alarm, key) {
+  watchList: function(hass, alarm, key) {
     getter = [
         this.hass.entityGetters.entityMap, 
         function(map) { 
@@ -225,6 +223,7 @@ Polymer({
     this.cleanup.push(hass.reactor.observe(getter, function(val) { this[key] = val; }.bind(this)));
   },
 
+  // When detached, stop observing
   detached: function() {
     this.cleanup.forEach(func => func());
     this.cleanup = [];
