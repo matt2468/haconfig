@@ -13,7 +13,7 @@
       }
 
       :host ::content .badge-container.ha-label-badge {
-        margin: 0px 16px;
+        margin: 0px 12px;
       }
 
       .actions {
@@ -37,15 +37,23 @@
         margin: 10px;
       }
 
-      .headsup {
-        margin: 5px;
+      .summary {
+        margin: 15px auto 0px;
         text-align: center;
       } 
 
       .oksign {
-        --iron-icon-fill-color: green;
-        --iron-icon-stroke-color: green;
-        margin: 10px auto;
+        color: green;
+      }
+
+      .badsign {
+        color: red;
+      }
+
+      .tappable {
+        cursor: pointer;
+        margin-top: 2px;
+        font-size: 1.2em;
       }
 
     </style>
@@ -72,16 +80,20 @@
                 <paper-button on-tap='disarm' raised>Disarm</paper-button>
             </template>
    
-            <div class='headsup'>
-              <template is='dom-if' if='[[issecure(headsup)]]'>
+            <div class='summary'>
+              <template is='dom-if' if='[[issecure(allsensors)]]'>
                  <div class='oksign'>
-                   <iron-icon class='greenicon' icon="mdi:checkbox-marked-circle" item-icon></iron-icon>
-                   Secure
+                   <iron-icon icon="mdi:checkbox-marked-circle" item-icon></iron-icon>
+                   Secured
                  </div>
               </template>
-              <template is='dom-if' if='[[!issecure(headsup)]]'>
-                <template is='dom-repeat' items='[[openheadsup(headsup)]]' as='entity'>
-                  <state-card-display state-obj="[[entity]]" hass='[[hass]]'></state-card-display>
+              <template is='dom-if' if='[[!issecure(allsensors)]]'>
+                <div class='badsign'>
+                   <iron-icon icon="mdi:alert-circle" item-icon></iron-icon>
+                   Open Sensors
+                </div>
+                <template is='dom-repeat' items='[[opensensors(allsensors)]]' as='entity'>
+                  <div class='tappable' on-tap='entityTapped' data-entity$='[[entity.entityId]]'>[[entity.entityDisplay]]</div>
                 </template>
               </template>
             </div>
@@ -127,13 +139,13 @@ Polymer({
     narrow:   { type: Boolean, value: false },
     showMenu: { type: Boolean, value: false },
     // things specific to this alarm panel
-    alarm:    { type: Object },
-    immediate:{ type: Array },
-    delayed:  { type: Array },
-    ignored:  { type: Array },
-    headsup:  { type: Array },
+    alarm:      { type: Object },
+    immediate:  { type: Array },
+    delayed:    { type: Array },
+    ignored:    { type: Array },
+    allsensors: { type: Array },
     // Hold our unobservers
-    cleanup:  { type: Array, value: [] },
+    cleanup:    { type: Array, value: [] },
   },
 
   observers: [ 'onPanelUpdate(hass, panel)', 'onAlarmUpdate(alarm)' ],
@@ -144,40 +156,42 @@ Polymer({
   armhome: function() { this.docall('alarm_arm_home'); },
   disarm:  function() { this.docall('alarm_disarm');   },
 
-  displayTapped: function() {
-    this.async(function () { this.hass.moreInfoActions.selectEntity(this.headsup[0].entityId); }.bind(this), 1);
+  entityTapped: function (ev) {
+    ev.stopPropagation();
+    var entityId = ev.target.getAttribute('data-entity');
+    this.async(function () { this.hass.moreInfoActions.selectEntity(entityId); }.bind(this), 1);
   },
 
   computeIcon: function (state) {
-     if (state === 'pending') {
-       return 'mdi:clock-fast';
-     } else if (state === 'armed_away') {
-       return 'mdi:nature';
-     } else if (state === 'armed_home') {
-       return 'mdi:home-variant';
-     } else if (state === 'triggered') {
-       return 'mdi:alert-circle';
+     switch (state) {
+        case 'disarmed':   return 'mdi:bell-sleep';
+        case 'armed_away': return 'mdi:nature';
+        case 'armed_home': return 'mdi:home';
+        case 'pending':    return 'mdi:walk';
+        case 'warning':    return 'mdi:run';
+        case 'triggered':  return 'mdi:alert-circle';
      }
-     return 'mdi:bell-outline';
+     return 'mdi:help';
   },
 
   computeLabel: function (state) {
-     if (state === 'pending') {
-       return 'pend';
-     } else if (state === 'armed_away' || state === 'armed_home') {
-       return 'armed';
-     } else if (state === 'triggered') {
-       return 'trig';
+     switch (state) {
+        case 'disarmed':   return 'off';
+        case 'armed_away': return 'away';
+        case 'armed_home': return 'home';
+        case 'pending':    return 'leave';
+        case 'warning':    return 'warn';
+        case 'triggered':  return 'alarm';
      }
-     return 'disarm';
+     return state;
   },
 
-  issecure: function(headsup) {
-     return headsup.reduce(function (a, e) { return a && e.state != 'on' && e.state != 'unlocked'; }, true);
+  issecure: function(all) {
+     return this.opensensors(all).length == 0; 
   },
 
-  openheadsup: function(headsup) {
-     return headsup.filter(function (e) { return e.state == 'on' || e.state == 'unlocked'; });
+  opensensors: function(all) {
+     return all.filter(function (e) { return e.state == 'on' || e.state == 'unlocked'; });
   },
 
 
@@ -195,7 +209,7 @@ Polymer({
     this.updateList(hass, alarm, 'immediate');
     this.updateList(hass, alarm, 'delayed');
     this.updateList(hass, alarm, 'ignored');
-    this.updateList(hass, alarm, 'headsup');
+    this.updateList(hass, alarm, 'allsensors');
   },
 
   // Set the list of entities based on each current list of entity ids provided
