@@ -103,10 +103,10 @@ class BWAlarm(alarm.AlarmControlPanel):
         }
 
 
-    ### Actions from the outside world that affect us, turn into events for internal processing
+    ### Actions from the outside world that affect us, turn into enum events for internal processing
 
-    def time_change_listener(self, event):
-        """ I just listen for the time events directly, its simpler then (re-/un-)registeration """
+    def time_change_listener(self, eventignored):
+        """ I just treat the time events as a periodic check, its simpler then (re-/un-)registration """
         if self._timeoutat is not None:
             if now() > self._timeoutat:
                 self._timeoutat = None
@@ -162,9 +162,9 @@ class BWAlarm(alarm.AlarmControlPanel):
     def process_event(self, event):
         """ 
            This is the core logic function.
-           The possible states and things that can change our state work are:
+           The possible states and things that can change our state are:
                  Actions:  isensor dsensor timeout arm_home arm_away disarm trigger
-           States: 
+           Current State: 
              disarmed         X       X       X      armh     pend     *     trig
              pending(T1)      X       X      arma     X        X      dis    trig
              armed(h/a)      trig    warn     X       X        X      dis    trig

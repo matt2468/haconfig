@@ -1,7 +1,7 @@
 platform: bwalarm
 name: House
 pending_time: 30
-trigger_time: 30
+trigger_time: 600
 alarm: switch.alarm
 warning: switch.warning
 headsup:
