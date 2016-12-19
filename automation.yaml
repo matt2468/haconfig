@@ -8,6 +8,29 @@
     service: shell_command.cleantemps
 
 
+- alias: Garage door toggle
+  trigger:
+    platform: state
+    entity_id: switch.garagedoor
+    state: 'on'
+    for: 
+      milliseconds: 100
+  action:
+    service: switch.turn_off
+    entity_id: switch.garagedoor
+
+- alias: Hot water cycle toggle
+  trigger:
+    platform: state
+    entity_id: switch.hotwater
+    state: 'on'
+    for: 
+      minutes: 5 
+  action:
+    service: switch.turn_off
+    entity_id: switch.hotwater
+    
+
 - alias: Turn external lights on before sunset
   trigger:
     platform: sun

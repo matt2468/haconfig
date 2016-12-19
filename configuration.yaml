@@ -7,14 +7,40 @@ homeassistant:
   unit_system: imperial
   time_zone: America/Los_Angeles
   customize:
+    binary_sensor.littlewindow:            { friendly_name: Little Window }
+    binary_sensor.diningwindow:            { friendly_name: Dining Window }
+    binary_sensor.primarymotion:           { friendly_name: Motion }
+    binary_sensor.livingroomwindow:        { friendly_name: Living Room Window }
+    binary_sensor.officewindow:            { friendly_name: Office Window }
+    binary_sensor.backdoor:                { friendly_name: Back Door }
+    binary_sensor.bedroomslider:           { friendly_name: Bedroom Slider }
+    binary_sensor.garagedoor:              { friendly_name: Garage Door }
+    binary_sensor.patioslider:             { friendly_name: Patio Slider }
+    binary_sensor.frontdoor:               { friendly_name: Front Door }
     climate.thermostat_heating_1_9_1:      { friendly_name: Thermostat }
     climate.thermostat_cooling_1_9_2:      { hidden: true }
     climate.thermostat_heating_econ_9_11:  { hidden: true }
     climate.thermostat_cooling_econ_9_12:  { hidden: true }
+    group.all_automations:                 { emulated_hue: false }
+    group.all_locks:                       { emulated_hue: false }
+    group.all_scripts:                     { emulated_hue: false }
+    group.all_switches:                    { emulated_hue: false }
+    lock.backdoorlock_locked_17_0:         { friendly_name: Backdoor Lock }
+    lock.frontdoorlock_locked_16_0:        { friendly_name: Frontdoor Lock }
     sensor.frontdoorlock_alarm_type_16_0:  { hidden: true }
     sensor.frontdoorlock_alarm_level_16_1: { hidden: true }
     sensor.backdoorlock_alarm_type_17_0:   { hidden: true }
     sensor.backdoorlock_alarm_level_17_1:  { hidden: true }
+    switch.alarm:                          { friendly_name: Alarm, emulated_hue: false }
+    switch.bedroomlight_switch_10_0:       { friendly_name: Bedroom Light }
+    switch.drivewaylight_switch_12_0:      { friendly_name: Driveway Light }
+    switch.fanswitch_switch_19_0:          { friendly_name: House Fan }
+    switch.frontdoorlight_switch_3_0:      { friendly_name: Frontdoor Light }
+    switch.garagedoor:                     { friendly_name: Garage Door }
+    switch.garagelight_switch_11_0:        { friendly_name: Garage Light }
+    switch.livingroomlight_switch_2_0:     { friendly_name: Livingroom Light }
+    switch.thermostat_switch_9_0:          { hidden: true, emulated_hue: false }
+
 
 logger:
   default: info
@@ -40,6 +66,10 @@ frontend:
 history:
 logbook:
 sun:
+
+emulated_hue:
+  type: alexa
+  expose_by_default: true
 
 
 # ZWave setup
@@ -105,22 +135,11 @@ binary_sensor:
 switch:
   - platform: bwio
     pins: 
-      11: garagedoorline
+      11: garagedoor
       15: alarm
-
-# The garage door 'switch' needs to toggle on and off, do it here
-script:
-  garagedoor:
-    sequence:
-      - service: switch.turn_on
-        data: { entity_id: switch.garagedoorline }
-      - delay:
-          milliseconds: 10
-      - service: switch.turn_off
-        data: { entity_id: switch.garagedoorline }
-
 
 # Deal with bizzare reports from my ZWave Thermostat
 shell_command:
   cleantemps: './cleantemps.py'
+
 
