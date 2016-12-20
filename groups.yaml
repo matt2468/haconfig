@@ -1,6 +1,0 @@
-outdoorlights:
-  name: Outdoor Lights
-  entities:
-    - switch.drivewaylight_switch_12_0
-    - switch.frontdoorlight_switch_3_0
-
