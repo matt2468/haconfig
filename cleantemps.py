@@ -1,10 +1,11 @@
 #!/usr/bin/env python3 
 import json
 import sqlite3
+import os.path
 try:
     # Find errneous temp states reported by the thermostat
     # If SET is outside (50,85) or MEASURED is outside (45,100) delete
-    conn = sqlite3.connect("home-assistant_v2.db")
+    conn = sqlite3.connect(os.path.join(os.path.dirname(__file__), "home-assistant_v2.db"))
     todel = list()
     for row in conn.execute("select state_id,attributes from states where domain='climate'"):
         attr = json.loads(row[1])

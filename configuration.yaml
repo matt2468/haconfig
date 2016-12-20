@@ -137,9 +137,11 @@ switch:
     pins: 
       11: garagedoor
       15: alarm
-
-# Deal with bizzare reports from my ZWave Thermostat
-shell_command:
-  cleantemps: './cleantemps.py'
-
+  - platform:   gitm
+    alarm:      alarm_control_panel.house
+    bedroom:    switch.bedroomlight_switch_10_0
+    downstairs: switch.livingroomlight_switch_2_0
+    wakeup:     '08:00'
+    tvtime:     '17:00'
+    bedtime:    '23:00'
 

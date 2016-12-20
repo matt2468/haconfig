@@ -1,13 +1,4 @@
 
-- alias: Clean out bad climate data from database
-  trigger:
-    platform: time
-    minutes: 0
-    seconds: 0
-  action:
-    service: shell_command.cleantemps
-
-
 - alias: Garage door toggle
   trigger:
     platform: state
@@ -30,7 +21,6 @@
     service: switch.turn_off
     entity_id: switch.hotwater
     
-
 - alias: Turn external lights on before sunset
   trigger:
     platform: sun
