@@ -40,7 +40,7 @@ class Ghost(switch.SwitchDevice):
         self.hass = hass
         self.active = False
         self.today = now().day - 1
-        self.times = dict()
+        self.times = {}
         # Sun provides a nice heartbeat for this process
         self.hass.bus.async_listen(EVENT_STATE_CHANGED, self.state_change_listener)
 
@@ -58,6 +58,8 @@ class Ghost(switch.SwitchDevice):
     def name(self):                return "Ghost"
     @property
     def is_on(self):               return self.active
+    @property
+    def device_state_attributes(self): return {k: v.strftime("%H:%M:%S") for (k, v) in self.times.items()}
         
     def state_change_listener(self, event):
         state = event.data.get('new_state', None)
@@ -80,27 +82,29 @@ class Ghost(switch.SwitchDevice):
         if cur.day != self.today: # new day, setup new times
             nextset = sunstate.attributes[STATE_ATTR_NEXT_SETTING]
             midnight = cur.replace(hour=0, minute=0, second=0, microsecond=0)
-            self.times['wake']  = midnight + self.wakeup  + td(minutes=uniform(-20, +20))
-            self.times['tv']    = midnight + self.tvtime  + td(minutes=uniform(-20, +20))
-            self.times['bed']   = midnight + self.bedtime + td(minutes=uniform(-20, +20))
 
-            self.times['leave'] = self.times['wake'] + td(minutes=20) + td(minutes=uniform(-3,3))
-            self.times['move']  = self.times['bed'] - td(seconds=20)
-            self.times['sleep'] = self.times['bed'] + td(minutes=uniform(10,15))
-            _LOGGER.debug("Set new times sunset: {} times: {}".format(nextset, self.times))
+            self.times['1. wake']  = midnight + self.wakeup  + td(minutes=uniform(-20, +20))
+            self.times['2. leave'] = self.times['1. wake'] + td(minutes=20) + td(minutes=uniform(-3,3))
+
+            self.times['3. tv']    = midnight + self.tvtime  + td(minutes=uniform(-20, +20))
+            self.times['4. bed']   = midnight + self.bedtime + td(minutes=uniform(-20, +20))
+            self.times['5. sleep'] = self.times['4. bed'] + td(minutes=uniform(10,15))
+
+            self.today = cur.day
+            self.update_ha_state()
+            _LOGGER.debug("Set new times sunset: {} {}".format(nextset, self.device_state_attributes))
 
         # times occur as wake [bed] leave [none] tv [liv] step [none] bed [bed] sleep [none]
         bed = liv = STATE_OFF
-        if   cur > self.times['sleep']: pass
-        elif cur > self.times['bed']:   bed = STATE_ON
-        elif cur > self.times['move']:  pass
-        elif cur > self.times['tv']:    liv = STATE_ON
-        elif cur > self.times['leave']: pass
-        elif cur > self.times['wake']:  bed = STATE_ON
+        if   cur > self.times['5. sleep']: pass
+        elif cur > self.times['4. bed']:   bed = STATE_ON
+        elif cur > self.times['3. tv']:    liv = STATE_ON
+        elif cur > self.times['2. leave']: pass
+        elif cur > self.times['1. wake']:  bed = STATE_ON
 
-        #if self.hass.states.get(self.bedroom).state != bed:
-        #   _LOGGER.debug("toggle bedroom")
-        #    switch.toggle(self.hass, self.bedroom)
+        if self.hass.states.get(self.bedroom).state != bed:
+            _LOGGER.debug("toggle bedroom")
+            switch.toggle(self.hass, self.bedroom)
         if self.hass.states.get(self.downstairs).state != liv:
             _LOGGER.debug("toggle living room")
             switch.toggle(self.hass, self.downstairs)
