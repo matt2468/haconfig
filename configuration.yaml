@@ -38,6 +38,7 @@ homeassistant:
     switch.frontdoorlight_switch_3_0:      { friendly_name: Frontdoor Light }
     switch.garagedoor:                     { friendly_name: Garage Door }
     switch.garagelight_switch_11_0:        { friendly_name: Garage Light }
+    switch.hotwaterswitch_switch_20_0:     { friendly_name: Hot Water }
     switch.livingroomlight_switch_2_0:     { friendly_name: Livingroom Light }
     switch.thermostat_switch_9_0:          { hidden: true, emulated_hue: false }
 

@@ -13,13 +13,13 @@
 - alias: Hot water cycle toggle
   trigger:
     platform: state
-    entity_id: switch.hotwater
+    entity_id: switch.hotwaterswitch_switch_20_0
     state: 'on'
     for: 
       minutes: 5 
   action:
     service: switch.turn_off
-    entity_id: switch.hotwater
+    entity_id: switch.hotwaterswitch_switch_20_0
     
 - alias: Turn external lights on before sunset
   trigger:
