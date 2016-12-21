@@ -76,7 +76,7 @@ def setup(hass, config):
 
     def start_refresher(event):
         """ Don't start the refresher until the zwave network is ready to go """
-        CODEGROUP.stoprefresher = track_time_change(hass, refresh_unknown, second=0)
+        CODEGROUP.stoprefresher = track_time_change(hass, refresh_unknown, second=[0,15,30,45])
 
     # Connect up to the zwave network
     CODEGROUP = EntityComponent(_LOGGER, DOMAIN, hass)
