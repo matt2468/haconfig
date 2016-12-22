@@ -59,7 +59,9 @@ class Ghost(switch.SwitchDevice):
     @property
     def is_on(self):               return self.active
     @property
-    def device_state_attributes(self): return {k: v.strftime("%H:%M:%S") for (k, v) in self.times.items()}
+    def device_state_attributes(self): 
+        keys = sorted(self.times.keys())
+        return {k: self.times[k].strftime("%H:%M:%S") for k in keys}
         
     def state_change_listener(self, event):
         state = event.data.get('new_state', None)

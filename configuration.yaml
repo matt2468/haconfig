@@ -33,6 +33,7 @@ homeassistant:
     sensor.backdoorlock_alarm_level_17_1:  { hidden: true }
     switch.alarm:                          { friendly_name: Alarm, emulated_hue: false }
     switch.bedroomlight_switch_10_0:       { friendly_name: Bedroom Light }
+    switch.doorbell:                       { hidden: true, emulated_hue: false }
     switch.drivewaylight_switch_12_0:      { friendly_name: Driveway Light }
     switch.fanswitch_switch_19_0:          { friendly_name: House Fan }
     switch.frontdoorlight_switch_3_0:      { friendly_name: Frontdoor Light }
@@ -41,6 +42,7 @@ homeassistant:
     switch.hotwaterswitch_switch_20_0:     { friendly_name: Hot Water }
     switch.livingroomlight_switch_2_0:     { friendly_name: Livingroom Light }
     switch.thermostat_switch_9_0:          { hidden: true, emulated_hue: false }
+    switch.warning:                        { hidden: true, emulated_hue: false }
 
 
 logger:
@@ -138,6 +140,14 @@ switch:
     pins: 
       11: garagedoor
       15: alarm
+  - platform: command_line
+    switches:
+      warning:
+        command_on: "/home/pi/sounds/playloop /home/pi/sounds/warning.wav &"
+        command_off: "killall playloop aplay"
+      doorbell:
+        command_on: "/home/pi/sounds/playloop /home/pi/sounds/bell.wav &"
+        command_off: "killall playloop aplay"
   - platform:   gitm
     alarm:      alarm_control_panel.house
     bedroom:    switch.bedroomlight_switch_10_0
