@@ -156,3 +156,15 @@ switch:
     tvtime:     '17:00'
     bedtime:    '23:00'
 
+camera:
+  - platform: amcrest
+    host: 192.168.2.3
+    name: Driveway Camera
+    username: snapshot
+    password: snapshot
+  - platform: amcrest
+    host: 192.168.2.4
+    name: FrontDoor Camera
+    username: snapshot
+    password: snapshot
+
