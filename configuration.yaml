@@ -112,9 +112,10 @@ sensor:
     value_template: '{{ value | multiply(0.001) }}'
   - platform: amcrestalert
     cameras:
-      - 192.168.2.3
-      - 192.168.2.4
-
+      - host: 192.168.2.3
+        name: Driveway
+      - host: 192.168.2.4
+        name: FrontDoor
 
 # This is all of the I/O from my custom board
 bwio:
