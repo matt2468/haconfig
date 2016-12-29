@@ -3,6 +3,7 @@ import voluptuous as vol
 
 from homeassistant.const import CONF_PLATFORM
 from homeassistant.helpers.entity import Entity
+from homeassistant.util.dt import now
 import homeassistant.helpers.config_validation as cv
 
 _LOGGER = logging.getLogger(__name__)
@@ -25,11 +26,21 @@ class AmcrestAlert(Entity):
         self._host = host
         self._name = "Amcrest-{}".format(host)
         self._state = None
+        self._ts    = now()
 
     def newalert(self, **kwargs):
         if self._host == kwargs.get('addr', None):
             _LOGGER.debug("updating {} with {}".format(self._host, kwargs))
             self._state = kwargs.get('event', b'').decode('utf_8')
+            self._ts = now()
+            self.update_ha_state()
+
+    def periodic(self):
+        if self._state is None:
+            return
+        diff = now() - self._ts
+        if diff.seconds > 20:
+            self._state = None
             self.update_ha_state()
 
     @property
