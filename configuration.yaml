@@ -49,6 +49,7 @@ logger:
   default: info
   logs:
     homeassistant.core: warning
+    homeassistant.components.http: warning
     homeassistant.components.sensor.command_line: warning
     custom_components: debug
     custom_components.bwio: info
@@ -76,7 +77,7 @@ emulated_hue:
 
 
 # ZWave setup
-zwave:
+xzwave:
   usb_path: /dev/zwave
   config_path: /home/pi/.homeassistant/ozwconfig
   polling_interval: 60000
@@ -109,6 +110,10 @@ sensor:
     command: "cat /sys/class/thermal/thermal_zone0/temp"
     unit_of_measurement: "°C"
     value_template: '{{ value | multiply(0.001) }}'
+  - platform: amcrestalert
+    cameras:
+      - 192.168.2.3
+      - 192.168.2.4
 
 
 # This is all of the I/O from my custom board
