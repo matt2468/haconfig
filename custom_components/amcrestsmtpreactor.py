@@ -14,7 +14,7 @@ class AmcrestSmtpReactor(threading.Thread):
     """ I'm not sure how best to deal with Twisted's global reactor, for now I assume """
     """ I'm the only one using it """
     def __init__(self, port, callback):
-        threading.Thread.__init__(self)
+        threading.Thread.__init__(self, daemon=True)
         self.factory = SMTPFactory(callback)
         reactor.listenTCP(port, self.factory)
 

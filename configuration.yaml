@@ -129,7 +129,7 @@ binary_sensor:
        2:  [ pin2,             opening ] # unknown signal, always ok, where is it?
        3:  [ primarymotion,    motion  ]
        # 4: disconnected wire in the wall of the bedroom
-       # 5: no input present
+       5:  [ doorbell,         sound   ]
        # 6: no input present
        # 7: isn't connected, used as ground
        8:  [ livingroomwindow, opening ]
