@@ -35,7 +35,7 @@ homeassistant:
     switch.bedroomlight_switch_10_0:       { friendly_name: Bedroom Light }
     switch.doorbell:                       { hidden: true, emulated_hue: false }
     switch.drivewaylight_switch_12_0:      { friendly_name: Driveway Light }
-    switch.fanswitch_switch_19_0:          { friendly_name: House Fan }
+    switch.fan_switch_21_0:                { friendly_name: House Fan }
     switch.frontdoorlight_switch_3_0:      { friendly_name: Frontdoor Light }
     switch.garagedoor:                     { friendly_name: Garage Door }
     switch.garagelight_switch_11_0:        { friendly_name: Garage Light }
@@ -77,7 +77,7 @@ emulated_hue:
 
 
 # ZWave setup
-zwave:
+xzwave:
   usb_path: /dev/zwave
   config_path: /home/pi/.homeassistant/ozwconfig
   polling_interval: 60000
@@ -110,12 +110,7 @@ sensor:
     command: "cat /sys/class/thermal/thermal_zone0/temp"
     unit_of_measurement: "°C"
     value_template: '{{ value | multiply(0.001) }}'
-  - platform: amcrestalert
-    cameras:
-      - host: 192.168.2.3
-        name: Driveway
-      - host: 192.168.2.4
-        name: FrontDoor
+
 
 # This is all of the I/O from my custom board
 bwio:
@@ -140,6 +135,10 @@ binary_sensor:
        13: [ patioslider,      opening ]
        14: [ frontdoor,        opening ]
        # 15 isn't connected, used as ground
+  - platform: amcrestserver
+    cameras:
+       192.168.2.3: driveway
+       192.168.2.4: frontyard
 
 switch:
   - platform: bwio
@@ -163,14 +162,10 @@ switch:
     bedtime:    '23:00'
 
 camera:
-  - platform: amcrest
-    host: 192.168.2.3
+  - platform: local_file
+    file_path: /var/video/driveway/lastsnap.jpg
     name: Driveway Camera
-    username: snapshot
-    password: snapshot
-  - platform: amcrest
-    host: 192.168.2.4
-    name: FrontDoor Camera
-    username: snapshot
-    password: snapshot
+  - platform: local_file
+    file_path: /var/video/frontyard/lastsnap.jpg
+    name: FrontYard Camera
 
